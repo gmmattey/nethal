@@ -1,5 +1,6 @@
 package com.nethal.core.fingerprint
 
+import com.nethal.core.discovery.PrivateIpRanges
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -34,6 +35,8 @@ class DefaultHttpFingerprintProbe(
 ) : HttpFingerprintProbe {
 
     override suspend fun probe(ip: String, port: Int): HttpFingerprintEvidence? = withContext(Dispatchers.IO) {
+        if (!isProbeAllowed(ip)) return@withContext null
+
         val url = URL("http://$ip:$port/")
         val connection = url.openConnection() as HttpURLConnection
         try {
@@ -76,3 +79,11 @@ private val TITLE_REGEX = Regex("<title[^>]*>(.*?)</title>", setOf(RegexOption.I
 
 internal fun extractHtmlTitle(html: String): String? =
     TITLE_REGEX.find(html)?.groupValues?.get(1)?.trim()?.takeIf(String::isNotEmpty)
+
+/**
+ * Mitigação de SSRF apontada por Marisa na revisão de segurança da Feat 3: o IP passado a
+ * `probe()` pode vir de entrada manual do usuário (Tela 2b/2c), não só do Discovery Engine —
+ * sem essa checagem o app faria GET para qualquer host público que o usuário digitasse (por
+ * engano ou não). Só permite prosseguir quando o IP é RFC 1918, mesma regra do `UpnpIgdProbe`.
+ */
+internal fun isProbeAllowed(ip: String): Boolean = PrivateIpRanges.isPrivate(ip)
