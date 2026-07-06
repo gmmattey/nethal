@@ -24,3 +24,14 @@ tasks.register<JavaExec>("nokiaManualCheck") {
     mainClass.set("com.nethal.core.driver.nokia.ManualCheckRunnerKt")
     standardInput = System.`in`
 }
+
+// Diagnostico manual do driver TP-Link contra hardware real - nunca roda em CI/test, so quando o
+// usuario dispara explicitamente. Ver ManualCheckRunner.kt (pacote tplink) para o porque de a
+// senha ser sempre interativa, nunca argumento de linha de comando.
+tasks.register<JavaExec>("tplinkManualCheck") {
+    group = "verification"
+    description = "Diagnostico manual contra um TP-Link Archer C6 real na LAN. Uso: gradlew :core:tplinkManualCheck --args=\"<ip> <usuario> [cbc|gcm]\""
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.nethal.core.driver.tplink.ManualCheckRunnerKt")
+    standardInput = System.`in`
+}
