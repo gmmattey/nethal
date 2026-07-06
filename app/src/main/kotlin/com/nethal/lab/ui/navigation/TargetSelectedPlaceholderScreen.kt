@@ -12,14 +12,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.nethal.core.model.NetworkTarget
 
 /**
- * Espaço reservado para a Tela 2 (Descoberta), fora do escopo desta entrega — o Discovery
- * Engine ainda não existe. Existe só para o fluxo de onboarding ter um destino final e
- * permitir acesso às Configurações.
+ * Espaço reservado para a Tela 3 (Equipamento detectado), fora do escopo desta entrega — o
+ * Fingerprint Engine ainda não existe (Feat 3). Existe só para o fluxo de descoberta ter um
+ * destino final após escolher um `NetworkTarget`, e permitir acesso às Configurações.
  */
 @Composable
-fun DiscoveryPlaceholderScreen(onOpenSettings: () -> Unit) {
+fun TargetSelectedPlaceholderScreen(target: NetworkTarget, onOpenSettings: () -> Unit) {
     Scaffold { padding ->
         Column(
             modifier = Modifier
@@ -29,8 +30,13 @@ fun DiscoveryPlaceholderScreen(onOpenSettings: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = "Descoberta de rede ainda não implementada nesta versão.",
+                text = "Equipamento escolhido: ${target.ip}",
                 style = MaterialTheme.typography.bodyLarge,
+            )
+
+            Text(
+                text = "Identificação de fabricante/modelo ainda não implementada nesta versão.",
+                style = MaterialTheme.typography.bodyMedium,
             )
 
             TextButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {

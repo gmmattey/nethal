@@ -1,12 +1,19 @@
 package com.nethal.lab.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.nethal.core.model.NetworkTarget
 import com.nethal.lab.ui.common.NetHalViewModelFactory
+import com.nethal.lab.ui.discovery.DiscoveryScreen
+import com.nethal.lab.ui.discovery.DiscoveryViewModel
 import com.nethal.lab.ui.onboarding.BetaOptInScreen
 import com.nethal.lab.ui.onboarding.BetaOptInViewModel
 import com.nethal.lab.ui.onboarding.WelcomeScreen
@@ -19,10 +26,9 @@ private object Routes {
     const val WELCOME = "welcome"
     const val PRIVACY = "privacy"
     const val BETA_OPT_IN = "beta_opt_in"
+    const val DISCOVERY = "discovery"
+    const val TARGET_SELECTED = "target_selected"
     const val SETTINGS = "settings"
-
-    // Placeholder até a Feat 2 (Discovery Engine) existir.
-    const val DISCOVERY_PLACEHOLDER = "discovery_placeholder"
 }
 
 @Composable
@@ -30,6 +36,11 @@ fun NetHalNavHost(
     viewModelFactory: NetHalViewModelFactory,
     navController: NavHostController = rememberNavController(),
 ) {
+    // Guardado no escopo do NavHost (não dentro de um `composable {}`) para sobreviver à
+    // navegação de "discovery" para "target_selected" — não há Fingerprint Engine ainda
+    // (Feat 3) para justificar um repositório/estado compartilhado mais formal.
+    var selectedTarget by remember { mutableStateOf<NetworkTarget?>(null) }
+
     NavHost(navController = navController, startDestination = Routes.WELCOME) {
         composable(Routes.WELCOME) {
             val viewModel: WelcomeViewModel = viewModel(factory = viewModelFactory)
@@ -50,17 +61,43 @@ fun NetHalNavHost(
             BetaOptInScreen(
                 viewModel = viewModel,
                 onDecided = {
-                    navController.navigate(Routes.DISCOVERY_PLACEHOLDER) {
+                    navController.navigate(Routes.DISCOVERY) {
                         popUpTo(Routes.WELCOME) { inclusive = true }
                     }
                 },
             )
         }
 
-        composable(Routes.DISCOVERY_PLACEHOLDER) {
-            DiscoveryPlaceholderScreen(
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+        composable(Routes.DISCOVERY) {
+            val viewModel: DiscoveryViewModel = viewModel(factory = viewModelFactory)
+
+            DiscoveryScreen(
+                viewModel = viewModel,
+                onSingleCandidateReady = { target ->
+                    selectedTarget = target
+                    navController.navigate(Routes.TARGET_SELECTED)
+                },
+                onCandidateChosen = { target ->
+                    selectedTarget = target
+                    navController.navigate(Routes.TARGET_SELECTED)
+                },
             )
+        }
+
+        composable(Routes.TARGET_SELECTED) {
+            val target = selectedTarget
+            if (target == null) {
+                // Estado perdido (ex.: processo recriado) — volta para a descoberta em vez
+                // de mostrar uma tela sem dado nenhum.
+                navController.navigate(Routes.DISCOVERY) {
+                    popUpTo(Routes.DISCOVERY) { inclusive = true }
+                }
+            } else {
+                TargetSelectedPlaceholderScreen(
+                    target = target,
+                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                )
+            }
         }
 
         composable(Routes.SETTINGS) {

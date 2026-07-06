@@ -7,6 +7,10 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Permissão normal (sem prompt em runtime), indispensável para qualquer socket de rede
+         — inclusive na LAN local (SSDP/UPnP do Discovery Engine, Feat 2/SIG-316-317). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".NetHalApplication"
         android:allowBackup="false"

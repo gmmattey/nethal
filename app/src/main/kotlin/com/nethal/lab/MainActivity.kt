@@ -14,7 +14,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val app = application as NetHalApplication
-        val viewModelFactory = NetHalViewModelFactory(app.consentRepository)
+        val viewModelFactory = NetHalViewModelFactory(
+            consentRepository = app.consentRepository,
+            discoveryEngine = app.discoveryEngine,
+            networkEnvironmentReader = app.networkEnvironmentReader,
+        )
 
         setContent {
             NetHalLabTheme {
