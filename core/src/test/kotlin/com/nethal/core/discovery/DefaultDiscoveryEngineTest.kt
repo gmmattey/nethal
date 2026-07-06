@@ -144,6 +144,59 @@ class DefaultDiscoveryEngineTest {
     }
 
     @Test
+    fun `flags possible double nat when gateway external ip is cgnat`() = runTest {
+        // 100.64.0.235 — faixa CGNAT real (RFC 6598) capturada do NokiaOntDriver contra a
+        // unidade física (SIG-333). Não é RFC 1918, mas é efetivamente uma camada de NAT
+        // adicional operada pela operadora e deve ser tratada como sinal de duplo NAT.
+        val engine = DefaultDiscoveryEngine(
+            networkEnvironmentReader = FakeNetworkEnvironmentReader(
+                environment = wifiEnvironment(gatewayIp = "192.168.1.1"),
+            ),
+            ssdpDiscoverer = FakeSsdpDiscoverer(
+                listOf(
+                    SsdpResponse(
+                        sourceIp = "192.168.1.1",
+                        location = "http://192.168.1.1:1900/rootDesc.xml",
+                        server = "GenericRouter/1.0",
+                        searchTarget = "urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+                        usn = "uuid:gateway",
+                    ),
+                ),
+            ),
+            upnpIgdProbe = FixedExternalIpUpnpIgdProbe(externalIp = "100.64.0.235"),
+        )
+
+        val result = engine.discover()
+
+        assertTrue(result.possibleDoubleNat)
+    }
+
+    @Test
+    fun `does not flag double nat when external ip is outside cgnat range`() = runTest {
+        // 100.63.x.x e 100.128.x.x estão fora de 100.64.0.0/10 (segundo octeto 64-127) —
+        // guarda contra falso positivo por engano de limite de faixa.
+        val engineBelowRange = DefaultDiscoveryEngine(
+            networkEnvironmentReader = FakeNetworkEnvironmentReader(
+                environment = wifiEnvironment(gatewayIp = "192.168.1.1"),
+            ),
+            ssdpDiscoverer = FakeSsdpDiscoverer(
+                listOf(
+                    SsdpResponse(
+                        sourceIp = "192.168.1.1",
+                        location = "http://192.168.1.1:1900/rootDesc.xml",
+                        server = "GenericRouter/1.0",
+                        searchTarget = "urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+                        usn = "uuid:gateway",
+                    ),
+                ),
+            ),
+            upnpIgdProbe = FixedExternalIpUpnpIgdProbe(externalIp = "100.63.0.5"),
+        )
+
+        assertFalse(engineBelowRange.discover().possibleDoubleNat)
+    }
+
+    @Test
     fun `does not flag double nat when external ip is public`() = runTest {
         val engine = DefaultDiscoveryEngine(
             networkEnvironmentReader = FakeNetworkEnvironmentReader(

@@ -65,8 +65,9 @@ class DefaultDiscoveryEngine(
 
     /**
      * Só sinaliza duplo NAT quando o probe consegue de fato ler o IP externo do gateway e
-     * ele é privado — falha ou ausência de UPnP no gateway nunca bloqueia o discovery normal
-     * (SIG-317). Ver aviso de validação de campo em `UpnpIgdProbe`.
+     * ele é privado (RFC 1918) ou CGNAT (RFC 6598) — falha ou ausência de UPnP no gateway
+     * nunca bloqueia o discovery normal (SIG-317). Ver aviso de validação de campo em
+     * `UpnpIgdProbe`.
      */
     private suspend fun detectDoubleNat(gatewayIp: String, ssdpResponses: List<SsdpResponse>): Boolean {
         val igdDescriptorUrl = ssdpResponses
@@ -75,6 +76,30 @@ class DefaultDiscoveryEngine(
             ?: return false
 
         val externalIp = upnpIgdProbe.probeExternalIp(igdDescriptorUrl) ?: return false
-        return PrivateIpRanges.isPrivate(externalIp)
+        return isCgnatOrPrivate(externalIp)
+    }
+
+    /**
+     * Heurística de duplo NAT (SIG-317): IP externo reportado pelo gateway via UPnP IGD que
+     * cai em RFC 1918 (`PrivateIpRanges.isPrivate`) OU em CGNAT (RFC 6598, `100.64.0.0/10` —
+     * segundo octeto entre 64 e 127) é sinal de que existe uma camada de NAT adicional entre
+     * o gateway e a internet pública. CGNAT é operado pela operadora (comum no Brasil), não
+     * pelo usuário, mas o efeito prático para o diagnóstico de rede é o mesmo de um duplo NAT
+     * doméstico: o "IP externo" do gateway não é roteável publicamente.
+     *
+     * Importante — isto é *só* a heurística de negócio do duplo NAT, não um guard de
+     * segurança: `PrivateIpRanges.isPrivate()` continua restrita a RFC 1918 e é a única
+     * checagem usada como guarda de SSRF (`UpnpIgdProbe.isLanUrl`,
+     * `HttpFingerprintProbe.isProbeAllowed`, `NokiaOntDriver`) — CGNAT não deve ampliar o que
+     * é considerado "seguro para fazer request", só o que é considerado "indício de NAT
+     * adicional" aqui em `detectDoubleNat`.
+     */
+    private fun isCgnatOrPrivate(ip: String): Boolean {
+        if (PrivateIpRanges.isPrivate(ip)) return true
+
+        val octets = ip.trim().split(".").mapNotNull { it.toIntOrNull() }
+        if (octets.size != 4 || octets.any { it !in 0..255 }) return false
+
+        return octets[0] == 100 && octets[1] in 64..127
     }
 }
