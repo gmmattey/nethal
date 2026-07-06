@@ -1,0 +1,218 @@
+{
+  "$schema": "https://nethal.dev/schema/compatibility-catalog-v1.json",
+  "manifestVersion": "2026.07.07",
+  "generatedAt": "2026-07-07T00:00:00Z",
+  "generatedBy": "diego-drivers-protocolos",
+  "previousManifest": "catalog-2026.07.06.json",
+  "profiles": [
+    {
+      "profileId": "nokia_g1425gb_v1",
+      "vendor": "Nokia",
+      "model": "G-1425G-B",
+      "deviceType": "ONT",
+      "family": "Nokia GPON RGW (Shanghai Bell / ex-Alcatel-Lucent)",
+      "firmwareKnown": [],
+      "stage": "DRAFT",
+      "stageReason": "Correção de modelo (G-1425G-A → G-1425G-B, o modelo real da unidade física do Luiz) mais reaproveitamento de um driver de produção do produto irmão SignallQ. Existe implementação real (NokiaAuthenticationClient/NokiaEndpointReader em core/driver/nokia) equivalente ao driver Nokia já rodando em produção no SignallQ, mas o NetHAL ainda não executou nenhum probe/login contra a unidade física — só o SignallQ o fez, contra hardware que o próprio Luiz confirma ser o mesmo modelo e presumivelmente firmware equivalente. Sem esse teste próprio, o profile permanece em DRAFT: a evidência é excelente, mas ainda indireta.",
+      "physicalTestAccess": true,
+      "physicalTestAccessNote": "Unidade citada no project charter como um dos dois equipamentos com acesso físico para teste, e confirmada pelo Luiz como G-1425G-B (não G-1425G-A, erro do manifesto anterior). Falta o Luiz rodar o driver novo do NetHAL (core/driver/nokia) contra a unidade física para promover a DISCOVERY_ONLY/READ_ONLY_ALPHA.",
+      "managementDefaults": {
+        "candidateIps": ["192.168.1.254", "192.168.254.254"],
+        "ipConfidence": 0.55,
+        "ipConfidenceNote": "192.168.1.254 e 192.168.254.254 são os dois IPs mais citados para a linha residencial Nokia G-1425G (o segundo especificamente citado para o G-1425G-B em fontes anteriores); o driver de produção do SignallQ não fixa IP (recebe do usuário ou do gateway detectado), então não há confirmação de IP fixo vinda dessa fonte. Confiança sobe em relação ao manifesto anterior porque a família/modelo agora está corrigida, mas o IP exato ainda depende de detecção de gateway ou input do usuário, não de um valor único confirmado. Mantido sem overlap com os candidateIps do TP-Link Archer C6 (192.168.0.1/192.168.1.1) para não colidir na resolução do Fingerprint Engine.",
+        "managementPort": 80,
+        "managementPortNote": "Confirmado pelo driver de produção do SignallQ (NokiaModemClient.baseUrl = \"http://$host\", sem HTTPS) — evidência de código real, não documental."
+      },
+      "credentialConvention": {
+        "defaultUser": null,
+        "defaultPasswordPattern": null,
+        "confidence": 0.0,
+        "confidenceNote": "Não existe senha padrão de fábrica conhecida ou documentada para este fluxo — o driver de produção do SignallQ sempre recebe usuário e senha como parâmetros de `login(username, password)`, informados pelo próprio usuário (mesmo padrão da Tela 5 da spec do NetHAL, ainda não implementada). Diferente do manifesto anterior (que citava um padrão AdminGPON/ALC#FGU nunca confirmado), aqui não há nem heurística de fallback: a evidência de produção mostra explicitamente que a credencial é sempre fornecida pelo usuário.",
+        "policyNote": "Não há credencial padrão a documentar. O NetHAL nunca deve tentar login automático — a UI (Tela 5, fora de escopo desta entrega) deve sempre pedir a credencial ao usuário, exatamente como o SignallQ faz hoje em produção."
+      },
+      "fingerprintEvidence": [
+        {
+          "type": "auth_mechanism",
+          "value": "Handshake de login: GET na raiz extrai `pubkey` (RSA, SubjectPublicKeyInfo/X.509 base64 dentro de `var pubkey = '...'`), `nonce` (`var nonce = \"...\"`) e `csrf_token` (`var token = \"...\"`) do HTML. Cliente gera 4 valores aleatórios de 16 bytes (aesKey, iv, decKey, decIv), monta payload `&username=...&password=...&csrf_token=...&nonce=...&enckey=...&enciv=...`, cifra com AES-CBC padding ISO/IEC 7816-4 (0x80 + zeros, NÃO PKCS5/PKCS7) usando aesKey/iv → `ct` (base64url sem padding). Cifra `\"base64(aesKey) base64(iv)\"` com RSA-PKCS#1v1.5 usando a pubkey extraída → `ck` (base64url-escape, `=`→`.`). POST `/login.cgi` com body `encrypted=1&ct=...&ck=...`. Sessão retorna via header `X-SID` ou cookie `sid`.",
+          "confidence": 0.85,
+          "confidenceLevel": "HIGH",
+          "source": "Código-fonte real do driver de produção do SignallQ (produto irmão, mesma empresa): C:\\Projetos\\SignallQ\\android\\feature\\fibra\\src\\main\\kotlin\\io\\veloo\\app\\kotlin\\feature\\fibra\\NokiaModemClient.kt e NokiaModemCrypto.kt. Não é pesquisa documental de terceiros — é implementação testada e rodando em produção contra hardware Nokia G-1425G-B real de cliente SignallQ.",
+          "note": "Confiança alta mas não máxima: é evidência de driver irmão validado em produção contra o MESMO MODELO, porém o NetHAL ainda não rodou seu próprio driver (implementado nesta entrega) contra a unidade física do Luiz. Firmware da unidade do Luiz pode divergir da(s) unidade(s) que validam o driver do SignallQ."
+        },
+        {
+          "type": "auth_mechanism",
+          "value": "Falha de login sinalizada via `err_t` no corpo da resposta: err_t=0 → sessão já em uso por outro acesso; err_t=1 → credenciais inválidas; err_t=2 → token expirado (nonce/csrf precisam ser recapturados, retry do zero).",
+          "confidence": 0.85,
+          "confidenceLevel": "HIGH",
+          "source": "NokiaModemClient.kt, bloco de tratamento de erro pós-POST /login.cgi (driver de produção do SignallQ).",
+          "note": "Mesma ressalva de confiança da evidência acima — driver irmão validado em produção, ainda sem teste próprio do NetHAL."
+        },
+        {
+          "type": "webui_menu_structure",
+          "value": ["/wan_status.cgi?gpon", "/show_wan_status.cgi?ipv4", "/index.cgi?getppp", "/device_status.cgi"],
+          "confidence": 0.85,
+          "confidenceLevel": "HIGH",
+          "source": "ExecutorFibra.kt (driver de produção do SignallQ) — os 4 endpoints GET autenticados chamados em sequência após login bem-sucedido, cada um com parser dedicado em NokiaModemParser.kt.",
+          "note": "Endpoints confirmados por código de produção, não por documentação pública. `/wan_status.cgi?gpon` retorna HTML/JS inline com campos GponConnectionStat/RXPower/TXPower/TransceiverTemperature/SerialNumber/SupplyVoltage(ou SupplyVottage)/LaserCurrent; `/show_wan_status.cgi?ipv4` retorna HTML/JS inline com objeto `wan_conns` (ExternalIPAddress, RemoteIPAddress, DNSServers, VLANIDMark, Uptime, ConnectionType); `/index.cgi?getppp` retorna JSON `{\"ppp_status\":[{...}]}`; `/device_status.cgi` retorna JSON com ModelName/Manufacturer/SerialNumber/SoftwareVersion/HardwareVersion/UpTime."
+        },
+        {
+          "type": "session_behavior",
+          "value": "Timeouts: connect 15s / read 30s em GET, read 60s em POST. Retry: até 3 tentativas com backoff 1s/2s entre tentativas subsequentes. Cookies de sessão (`sid`, `lsid`, `lang`) e header `X-SID` reenviados em cada request subsequente; redirecionamentos HTTP seguidos manualmente (até 5 hops) para preservar `Set-Cookie` de cada hop.",
+          "confidence": 0.85,
+          "confidenceLevel": "HIGH",
+          "source": "NokiaModemClient.kt e ExecutorFibra.kt (driver de produção do SignallQ).",
+          "note": "Parâmetros de timeout/retry replicados no driver novo do NetHAL (core/driver/nokia) exatamente como no SignallQ — não há motivo para divergir sem evidência de campo própria."
+        },
+        {
+          "type": "html_title",
+          "value": null,
+          "confidence": 0.0,
+          "confidenceLevel": "NONE_VERIFIED",
+          "source": "O driver de produção do SignallQ não depende do `<title>` da página de login para nada (usa regex direto em `pubkey`/`nonce`/`token`), então não há captura desse campo específico na evidência disponível.",
+          "note": "Não inventar valor. Campo permanece null até um probe real (passivo, GET simples) do NetHAL contra a unidade física do Luiz."
+        },
+        {
+          "type": "http_headers",
+          "value": null,
+          "confidence": 0.0,
+          "confidenceLevel": "NONE_VERIFIED",
+          "source": "Nenhuma evidência de header `Server`/`WWW-Authenticate` foi extraída do driver de produção do SignallQ (ele não lê esses headers para lógica de negócio).",
+          "note": "Campo permanece null até probe real. Não afeta a autenticação, que já está bem evidenciada por outras entradas."
+        }
+      ],
+      "expectedProtocols": [
+        {"protocol": "HTTP_LOCAL_WEBUI", "detectionState": "SUPPORTED", "note": "Confirmado por driver de produção do SignallQ rodando em campo contra este exato modelo — porta 80, sem HTTPS. Evidência de código real, não documental."},
+        {"protocol": "TR-069_CWMP", "detectionState": "UNKNOWN", "note": "Herdado do manifesto anterior (evidência documental sobre a família G-1425G, não confirmada especificamente para o G-1425G-B nem tocada pelo driver do SignallQ, que não usa TR-069). Continua fingerprint passivo apenas, nunca canal de ação local."},
+        {"protocol": "UPNP_IGD", "detectionState": "UNKNOWN", "note": "Herdado do manifesto anterior — plausível por convenção de linha residencial Nokia, não confirmado nem tocado pelo driver do SignallQ."}
+      ],
+      "capabilities": [
+        {"id": "READ_DEVICE_INFO", "state": "EXPERIMENTAL", "reason": "Endpoint `/device_status.cgi` e parser equivalentes ao driver de produção do SignallQ existem em core/driver/nokia (NokiaDeviceInfoReader), cobertos por testes determinísticos com fakes. Ainda sem execução real contra a unidade física do NetHAL — por isso EXPERIMENTAL, não AVAILABLE."},
+        {"id": "READ_WAN_STATUS", "state": "EXPERIMENTAL", "reason": "Endpoint `/show_wan_status.cgi?ipv4` e parser equivalentes (NokiaWanStatusReader) implementados e testados com fakes; sem teste real contra hardware do NetHAL ainda."},
+        {"id": "READ_SIGNAL", "state": "EXPERIMENTAL", "reason": "Endpoint `/wan_status.cgi?gpon` (potência óptica RX/TX, temperatura, tensão, corrente do laser) implementado como NokiaGponStatusReader, com as mesmas conversões de unidade do driver de produção (mW→dBm, Q8.8, /10000, /500). Sem teste real contra hardware do NetHAL ainda."},
+        {"id": "READ_UPTIME", "state": "EXPERIMENTAL", "reason": "Uptime de WAN (`/show_wan_status.cgi?ipv4`) e de dispositivo (`/device_status.cgi`) cobertos pelos mesmos leitores acima. Sem teste real."},
+        {"id": "READ_FIRMWARE", "state": "EXPERIMENTAL", "reason": "Campo SoftwareVersion/HardwareVersion de `/device_status.cgi`, mesmo parser do driver de produção do SignallQ. Sem teste real."}
+      ],
+      "knownFirmwareBugs": [
+        {
+          "description": "Firmware expõe o campo de tensão de alimentação do transceptor óptico com typo real: `SupplyVottage` (em vez de `SupplyVoltage`) em pelo menos parte do parque testado pelo SignallQ. O parser precisa aceitar os dois nomes de campo.",
+          "confidence": 0.8,
+          "source": "NokiaModemParser.kt do driver de produção do SignallQ (comentário explícito no código: 'Nokia firmware tem typo: SupplyVottage (sic). Aceitar as duas grafias'). Replicado no parser do NetHAL."
+        },
+        {
+          "description": "Alguns firmwares desta família reportam potência óptica de RX sem o sinal negativo (ex.: retornam '22.7' em vez de '-22.7' dBm) — necessário normalizar valores no range plausível (1–60) para negativo.",
+          "confidence": 0.6,
+          "source": "NokiaModemParser.kt do driver de produção do SignallQ, função `normalizeRx`. Replicado no parser do NetHAL."
+        }
+      ],
+      "operatorProvisioningRisk": {
+        "risk": "HIGH",
+        "note": "ONT de operadora (perfil CPE-ISP), mesma classificação do manifesto anterior. Este driver só implementa leitura (4 GETs), nenhuma ação de escrita — risco de reprovisionamento via ACS/TR-069 permanece teórico até o dia em que uma capability de escrita for proposta, o que não é o caso desta entrega."
+      },
+      "confidenceScoreOverall": 0.55,
+      "confidenceScoreOverallNote": "Sobe de 0.25 (manifesto anterior, G-1425G-A, só pesquisa documental de terceiros) para 0.55 porque a fonte de evidência mudou de qualidade: agora vem de código de produção real de um driver irmão (SignallQ) testado em campo contra o mesmo modelo exato de hardware (G-1425G-B), incluindo autenticação bem-sucedida e leitura validada dos 4 endpoints em uso real — não mais suposição de terceiros. Cálculo pela heurística de /protocolos-locais: 0 de 'match de headers/banners' real (title/Server ainda não capturados por probe do NetHAL = 0/0.25); 0.20 de 'match de descritor/endpoint canônico real' (os 4 endpoints e o handshake de login são confirmados por código de produção, não suposição = 0.20/0.20); 0 de 'autenticação testada' pelo NetHAL propriamente (0/0.20 — quem testou foi o SignallQ, não o NetHAL, por isso não pontua aqui); 0 de 'capability sanity check' pelo NetHAL (0/0.15, mesma razão); 0.10 de 'firmware/modelo no catálogo offline' (documentação oficial da família ainda vale); 0.10 de 'evidência comunitária/histórico local bem-sucedido' — inflado propositalmente de 'comunitário' para 'histórico de produção interno', que é uma fonte ainda mais forte, mas mantido no teto da categoria (0.10/0.10) para não ultrapassar 1.0 mesmo IGNORANDO o teste real do NetHAL. Resultado: 0.55, na faixa 0.50–0.75 (leitura autenticada permitida segundo a tabela de decisão), mas deliberadamente não posto acima disso e sem promover o `stage` além de DRAFT — a tabela de score é sobre o que o software pode fazer tecnicamente, não substitui o critério de promoção de estágio do driver (`/ciclo-vida-driver`), que exige teste real e documentado do próprio NetHAL contra a unidade física, ainda pendente (próximo passo do Luiz)."
+    },
+    {
+      "profileId": "tplink_archer_c6_v1",
+      "vendor": "TP-Link",
+      "model": "Archer C6",
+      "deviceType": "ROUTER",
+      "family": "TP-Link Archer (AC1200 dual-band)",
+      "firmwareKnown": ["v2.x (hardware v2)", "v4.0 (hardware v4)"],
+      "stage": "DRAFT",
+      "stageReason": "Nenhum teste real (modelo + firmware) executado ainda contra a unidade física de homologação. Evidência abaixo é documental/de terceiros e do emulador oficial do fabricante, não coletada por probe direto do NetHAL. Profile mantido inalterado nesta rodada — o trabalho desta entrega foi exclusivamente sobre o profile Nokia.",
+      "physicalTestAccess": true,
+      "physicalTestAccessNote": "Unidade citada no project charter como um dos dois equipamentos com acesso físico para teste. Homologação real ainda não executada.",
+      "managementDefaults": {
+        "candidateIps": ["192.168.0.1", "192.168.1.1", "tplinkwifi.net"],
+        "ipConfidence": 0.85,
+        "ipConfidenceNote": "192.168.0.1 é o IP padrão confirmado por múltiplas fontes (documentação oficial TP-Link, SetupRouter, router-network) para hardware v2 e v4 do Archer C6. tplinkwifi.net é o hostname de conveniência oficial documentado pela TP-Link.",
+        "managementPort": 80,
+        "managementPortNote": "HTTP por padrão; HTTPS local disponível mas opcional/desabilitado por padrão, conforme guia oficial TP-Link ('Tutorial TP-LINK Archer C6 AC1200 - Enable HTTPS') e uso de certificado self-signed quando habilitado."
+      },
+      "credentialConvention": {
+        "defaultUser": null,
+        "defaultPasswordPattern": "Definida pelo usuário no primeiro setup (sem usuário/senha de fábrica fixos em hardware v4; hardware v2 mais antigo podia usar admin/admin)",
+        "confidence": 0.6,
+        "confidenceNote": "Confirmado por documentação oficial TP-Link e SetupRouter que hardware v4 exige criação de senha no primeiro acesso, sem usuário. Hardware v2 mais antigo segue convenção legada admin/admin, mas não confirmado com fonte primária nesta pesquisa.",
+        "policyNote": "Sem tentativa automática de login em nenhum caso — mesma regra do Nokia."
+      },
+      "fingerprintEvidence": [
+        {
+          "type": "html_title",
+          "value": null,
+          "confidence": 0.0,
+          "confidenceLevel": "NONE_VERIFIED",
+          "source": "WebFetch ao emulador oficial (https://emulator.tp-link.com/c6-us-v2/index.html) não retornou a tag <title> ou <head> completa — apenas fragmento de corpo/navegação processado pelo modelo de resumo. Página de login direta (frame/login.html) retornou HTTP 404 no emulador.",
+          "note": "Não inventar valor. O emulador existe e é uma fonte legítima e verificável (https://emulator.tp-link.com/c6-us-v2/index.html), mas a ferramenta de fetch usada nesta pesquisa não expôs o HTML bruto da tag title. Próximo passo: captura manual de HTML bruto (curl/DevTools) contra o emulador ou a unidade física antes de promover este campo a confiança maior."
+        },
+        {
+          "type": "http_headers",
+          "value": null,
+          "confidence": 0.0,
+          "confidenceLevel": "NONE_VERIFIED",
+          "source": "Nenhuma fonte pública consultada nesta pesquisa reproduziu literalmente o header Server: ou WWW-Authenticate: do httpd do Archer C6.",
+          "note": "Não inventar string de header. Captura real fica pendente de probe HTTP direto (permitido: GET simples na tela de login, sem autenticação, é fingerprint passivo válido) contra a unidade física de homologação."
+        },
+        {
+          "type": "auth_mechanism",
+          "value": "Login via formulário HTTP com senha ofuscada/criptografada no cliente (AES-CBC em firmwares antigos, AES-GCM em firmwares recentes; padrão 'web encrypted password' descrito como JS gerando hash/cifra antes do POST)",
+          "confidence": 0.7,
+          "confidenceLevel": "MEDIUM_HIGH",
+          "source": "README do projeto comunitário TP-Link-Archer-C6U (AlexandrErohin), que declara suporte a 85+ roteadores TP-Link/Mercusys incluindo a série Archer C, com AES-CBC para firmwares antigos e AES-GCM para recentes. https://github.com/AlexandrErohin/TP-Link-Archer-C6U — já citado como reuso conhecido em docs/architecture/driver-adoption-strategy.md.",
+          "note": "Evidência de comportamento de biblioteca de terceiros amplamente usada e citada na pesquisa anterior de Diego (driver-adoption-strategy.md), não captura direta do tráfego desta unidade física. Precisa ser confirmado por teste real antes de qualquer implementação de Authentication Manager para este modelo."
+        },
+        {
+          "type": "session_behavior",
+          "value": "WebUI aceita apenas uma sessão autenticada simultânea — deixar o painel aberto no navegador pode causar falha de login por outro cliente",
+          "confidence": 0.55,
+          "confidenceLevel": "MEDIUM",
+          "source": "Padrão documentado de forma consistente na pesquisa anterior (docs/architecture/driver-adoption-strategy.md e docs/drivers/local-drivers-brazil.md) para a família TP-Link Archer em geral, já refletido em spec.md §10/§11 (Tela 5). Não é evidência nova desta rodada, mas se aplica diretamente ao C6 como membro da família Archer.",
+          "note": "Já está refletido como regra de produto (aviso na Tela 5 de autenticação), independente de confirmação específica no C6."
+        },
+        {
+          "type": "webui_menu_structure",
+          "value": ["Quick Setup", "Basic (status/wireless/network map)", "Advanced (wireless, network, security, USB, IPv6, etc.)", "AP Quick Setup (modo access point)", "Settings"],
+          "confidence": 0.6,
+          "confidenceLevel": "MEDIUM",
+          "source": "Emulador oficial do fabricante, https://emulator.tp-link.com/c6-us-v2/index.html — navegação confirmada para pages/frame/quick-setup.html, pages/frame/basic.html, pages/frame/advanced.html, pages/frame/ap-quick-setup.html, pages/frame/settings.html.",
+          "note": "Estrutura de alto nível confirmada pelo emulador oficial (fonte primária do fabricante), mas os endpoints internos de dados (JSON/cgi-bin exatos por seção) não foram capturados nesta pesquisa."
+        },
+        {
+          "type": "vendor_app_reference",
+          "value": "Aplicativo companion 'TP-Link Tether' referenciado no WebUI (links iTunes/Google Play)",
+          "confidence": 0.8,
+          "confidenceLevel": "HIGH",
+          "source": "Confirmado diretamente no HTML navegável do emulador oficial https://emulator.tp-link.com/c6-us-v2/index.html.",
+          "note": "Bom sinal de fingerprint complementar (presença de referências 'TP-Link Tether' na WebUI), mas não substitui título/headers HTTP como evidência primária de fingerprint passivo."
+        }
+      ],
+      "expectedProtocols": [
+        {"protocol": "HTTP_LOCAL_WEBUI", "detectionState": "SUPPORTED", "note": "Confirmado por múltiplas fontes e emulador oficial. Porta 80 por padrão."},
+        {"protocol": "HTTPS_LOCAL_WEBUI", "detectionState": "REQUIRES_AUTH", "note": "Disponível mas opcional, requer habilitação manual e usa certificado self-signed (aviso de 'Privacy Error' esperado no browser)."},
+        {"protocol": "TR-069_CWMP", "detectionState": "UNKNOWN", "note": "TP-Link documenta suporte a TR-069/gestão remota 'Agile' em parte do catálogo atual, não confirmado especificamente para o C6 nesta pesquisa. Fingerprint passivo apenas, se existir."},
+        {"protocol": "UPNP_IGD", "detectionState": "UNKNOWN", "note": "Comum na linha Archer em geral por convenção de mercado, não confirmado diretamente para o C6 nesta pesquisa."}
+      ],
+      "capabilities": [
+        {"id": "READ_DEVICE_INFO", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT."},
+        {"id": "READ_WAN_STATUS", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT."},
+        {"id": "READ_WIFI_STATUS", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT."},
+        {"id": "READ_CONNECTED_CLIENTS", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT."},
+        {"id": "READ_FIRMWARE", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT."},
+        {"id": "REBOOT_DEVICE", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT. Biblioteca comunitária (TP-Link-Archer-C6U) demonstra suporte a esta ação em modelos da família, mas não é evidência de teste próprio."}
+      ],
+      "knownFirmwareBugs": [
+        {
+          "description": "Atualizações de firmware podem quebrar compatibilidade de integrações não oficiais (mudança de esquema de criptografia de senha, endpoints internos) sem aviso prévio ao usuário final.",
+          "confidence": 0.6,
+          "source": "Observação recorrente do maintainer do projeto comunitário TP-Link-Archer-C6U e já registrada em docs/architecture/driver-adoption-strategy.md."
+        }
+      ],
+      "operatorProvisioningRisk": {
+        "risk": "LOW",
+        "note": "Roteador de varejo, não gerenciado por ACS de operadora na configuração padrão (salvo se o revendedor/operadora tiver habilitado TR-069 remoto, o que não é o padrão de fábrica documentado)."
+      },
+      "confidenceScoreOverall": 0.35,
+      "confidenceScoreOverallNote": "Score baixo/médio — melhor que o Nokia porque há confirmação de fonte primária do fabricante (emulador oficial) para IP, estrutura de menu e existência de WebUI, mas ainda sem probe HTTP real contra a unidade física, sem título/headers capturados e sem autenticação testada. Cálculo: 0 de 'match de headers/banners' real (title/Server ainda não capturados = 0/0.25), 0.10 de 'match de descritor/endpoint canônico' (estrutura de páginas confirmada via emulador oficial, mas parcial), 0 de 'autenticação testada' (0/0.20), 0 de 'capability sanity check' (0/0.15), 0.10 de 'firmware/modelo no catálogo offline' (documentação oficial + emulador), 0.15 de 'evidência comunitária' (projeto TP-Link-Archer-C6U bem estabelecido e citado)."
+    }
+  ]
+}

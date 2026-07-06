@@ -6,7 +6,7 @@ fallback local para o Driver Registry (§8.5 da spec de produto). O Driver Regis
 do Bruno, Feat 3 / SIG-309) carrega este arquivo como base offline e sincroniza contra uma versão
 remota mais nova quando houver conexão, sem nunca bloquear uso offline — mesma regra do §8.5.
 
-## Por que Nokia G-1425G-A e TP-Link Archer C6 são os dois primeiros profiles
+## Por que Nokia G-1425G-B e TP-Link Archer C6 são os dois primeiros profiles
 
 Critério único e explícito: são os dois únicos equipamentos com **acesso físico real para teste**,
 citados no project charter. Toda promoção de estágio de driver exige teste real documentado
@@ -14,6 +14,14 @@ citados no project charter. Toda promoção de estágio de driver exige teste re
 equipamentos que o squad não consegue testar fisicamente ainda. Outros alvos da matriz de
 priorização (`docs/architecture/driver-adoption-strategy.md`) continuam válidos como roadmap, mas
 entram no catálogo quando houver acesso físico ou parceria de teste equivalente.
+
+> **Correção de modelo (2026-07-07):** o manifesto `catalog-2026.07.06.json` pesquisou o Nokia
+> como **G-1425G-A** por engano. O Luiz confirmou que a unidade física de teste do NetHAL é o
+> **G-1425G-B** — mesmo modelo do driver Nokia já em produção no SignallQ (produto irmão). O
+> profile foi recriado (`nokia_g1425ga_v1` → `nokia_g1425gb_v1`) no manifesto
+> `catalog-2026.07.07.json`, com evidência de fingerprint agora vinda de código de produção real
+> (ver seção "Fontes consultadas" abaixo), não mais de pesquisa documental de terceiros sobre o
+> modelo errado.
 
 ## Localização e nomenclatura
 
@@ -144,7 +152,9 @@ ambos abaixo de `0.50` porque nenhum header/título/autenticação foi capturado
 
 1. **Entrada em `DRAFT`**: profile criado com o máximo de evidência documental pública verificável
    (fabricante, comunidade, bibliotecas de reuso), mas sem nenhum probe real. É o estado deste
-   manifesto para Nokia G-1425G-A e TP-Link Archer C6.
+   manifesto para Nokia G-1425G-B e TP-Link Archer C6 — mesmo o Nokia tendo, nesta rodada, uma
+   implementação de driver real em `core/driver/nokia` (ver nota abaixo), o `stage` permanece
+   `DRAFT` porque nenhum probe/login foi executado pelo NetHAL contra a unidade física.
 2. **`DRAFT → DISCOVERY_ONLY`**: primeiro probe passivo real contra a unidade física (GET simples
    na tela de login, captura de headers, sem autenticação) documentado com timestamp e output real.
    Atualiza `fingerprintEvidence[]` substituindo `value: null` por valores capturados e recalcula
@@ -154,25 +164,55 @@ ambos abaixo de `0.50` porque nenhum header/título/autenticação foi capturado
 4. Estágios seguintes seguem exatamente `/ciclo-vida-driver` — este documento não duplica aquela
    skill, apenas aponta onde o estágio do profile fica registrado (campo `stage` do manifesto).
 
+## Fonte de evidência "driver de produção de produto irmão"
+
+O profile `nokia_g1425gb_v1` (manifesto `2026.07.07`) introduz uma categoria de evidência mais
+forte que "documentação pública de terceiros": código-fonte real de um driver de produção,
+rodando em campo, do produto irmão SignallQ (`C:\Projetos\SignallQ\android\feature\fibra`), contra
+o mesmo modelo exato de hardware. Isso não é probe do NetHAL — o `stage` do profile continua
+`DRAFT` e a heurística de score trata essa fonte como "evidência comunitária/histórico local"
+(0,10 do teto da categoria), não como "autenticação testada" ou "capability sanity check" (que só
+pontuam quando o próprio NetHAL executa o teste). Ver `fingerprintEvidence[].source` do profile
+para a citação exata de cada arquivo do SignallQ usado como referência.
+
+O driver correspondente no NetHAL (`core/src/main/kotlin/com/nethal/core/driver/nokia/`) foi
+implementado do zero para o vocabulário do NetHAL, usando o código do SignallQ como referência de
+protocolo (handshake RSA+AES, endpoints, conversões de unidade, aliases de campo incluindo o typo
+conhecido de firmware `SupplyVottage`) — não é uma cópia literal de arquivo.
+
 ## Consumo pelo Driver Registry (fora de escopo desta entrega)
 
 O parsing/deserialização deste JSON em Kotlin, a lógica de diff incremental entre manifestos e a
 integração com o `DriverRegistry` real são responsabilidade do Bruno na Feat 3 (SIG-309). Este
-documento e o `catalog-2026.07.06.json` são o insumo de dados — não incluem implementação de
-parser, cliente HTTP de sincronização ou testes de unidade Kotlin.
+documento e o `catalog-2026.07.07.json` são o insumo de dados — não incluem implementação de
+parser, cliente HTTP de sincronização ou testes de unidade Kotlin (o `DriverRegistry` em si já
+existe e está coberto por testes próprios em `core/src/test/kotlin/com/nethal/core/catalog/`,
+mas a lógica de diff incremental entre manifestos permanece não implementada).
 
-## Fontes consultadas nesta rodada (2026-07-06)
+## Fontes consultadas — manifesto `2026.07.07` (2026-07-07)
 
-Ver `fingerprintEvidence[].source` de cada profile no próprio JSON para a citação exata por
-evidência. Resumo das fontes de maior peso:
+- **Nokia G-1425G-B**: código-fonte real do driver Nokia de produção do SignallQ
+  (`C:\Projetos\SignallQ\android\feature\fibra\...\NokiaModemClient.kt`,
+  `NokiaModemCrypto.kt`, `NokiaModemParser.kt`, `ExecutorFibra.kt`) — driver autenticado rodando em
+  campo contra este exato modelo de hardware. Fonte de confiança muito mais alta que pesquisa
+  documental de terceiros, mas ainda não é um teste do próprio NetHAL (ver seção "Fonte de
+  evidência 'driver de produção de produto irmão'" acima).
+- **TP-Link Archer C6**: inalterado nesta rodada — mesmas fontes do manifesto anterior (emulador
+  oficial TP-Link, SetupRouter.com, GitHub `AlexandrErohin/TP-Link-Archer-C6U`).
 
-- **Nokia G-1425G-A**: manuals.plus (identificação do documento oficial "Nokia ONT G-1425G-A
-  Product Guide", 3FE-77771-AAAA-TCZZA Issue 5, Nov/2021 — conteúdo bloqueado por HTTP 403 no
-  fetch direto); made4it.com.br (TR-069/DHCP Option 43 para G-1425-GA); ManualsLib (G-1425G-E,
-  variante irmã, estrutura de menu e TR-369); router-network.com e knowledgebase.bison.co.in
-  (convenção AdminGPON/ALC#FGU e IP 192.168.1.254 para a família Nokia GPON, não confirmado
-  especificamente para o G-1425G-A); hack-gpon.org (G-010G-Q, explicitamente tratado como *não*
-  extrapolável ao G-1425G-A por ser hardware/chipset diferente).
+## Fontes consultadas — manifesto `2026.07.06` (histórico, modelo Nokia incorreto)
+
+Ver `fingerprintEvidence[].source` de cada profile no próprio JSON (`catalog-2026.07.06.json`)
+para a citação exata por evidência. Resumo das fontes de maior peso:
+
+- **Nokia G-1425G-A (modelo incorreto — corrigido para G-1425G-B no manifesto `2026.07.07`)**:
+  manuals.plus (identificação do documento oficial "Nokia ONT G-1425G-A Product Guide",
+  3FE-77771-AAAA-TCZZA Issue 5, Nov/2021 — conteúdo bloqueado por HTTP 403 no fetch direto);
+  made4it.com.br (TR-069/DHCP Option 43 para G-1425-GA); ManualsLib (G-1425G-E, variante irmã,
+  estrutura de menu e TR-369); router-network.com e knowledgebase.bison.co.in (convenção
+  AdminGPON/ALC#FGU e IP 192.168.1.254 para a família Nokia GPON, não confirmado especificamente
+  para o G-1425G-A); hack-gpon.org (G-010G-Q, explicitamente tratado como *não* extrapolável ao
+  G-1425G-A por ser hardware/chipset diferente).
 - **TP-Link Archer C6**: emulador oficial do fabricante
   (https://emulator.tp-link.com/c6-us-v2/index.html — fonte primária para estrutura de menu e
   confirmação de app companion "TP-Link Tether"); documentação oficial TP-Link (IP padrão, guia de
@@ -185,3 +225,15 @@ ferramentas de pesquisa disponíveis (WebSearch/WebFetch) não substituem um pro
 contra a unidade física. Isso é declarado explicitamente no manifesto (`value: null`,
 `confidenceLevel: NONE_VERIFIED`) para as duas evidências mais importantes de fingerprint HTTP
 (título HTML e headers) em ambos os profiles.
+
+## Changelog
+
+- **2026-07-07** — Corrigido modelo Nokia de `G-1425G-A` para `G-1425G-B` (a unidade física de
+  teste do NetHAL, confirmada pelo Luiz, é o G-1425G-B; o manifesto anterior pesquisou o modelo
+  errado). Novo manifesto `catalog-2026.07.07.json` (`previousManifest: catalog-2026.07.06.json`)
+  com `profileId` novo (`nokia_g1425ga_v1` → `nokia_g1425gb_v1`), evidência de fingerprint agora
+  citando o driver de produção do SignallQ como fonte, e `confidenceScoreOverall` recalculado de
+  `0.25` para `0.55`. Implementado driver Nokia real (leitura, 4 endpoints) em
+  `core/src/main/kotlin/com/nethal/core/driver/nokia/`. Profile TP-Link mantido inalterado.
+- **2026-07-06** — Manifesto inicial (`catalog-2026.07.06.json`), dois profiles em `DRAFT`
+  (Nokia G-1425G-A — modelo incorreto — e TP-Link Archer C6), evidência 100% documental.

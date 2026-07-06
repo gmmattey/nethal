@@ -12,8 +12,8 @@ class DriverRegistryTest {
     fun `loads embedded manifest with the two real profiles`() {
         val registry = DefaultDriverRegistry(embeddedManifestLoader = ::loadEmbeddedCatalogResource)
 
-        assertEquals("2026.07.06", registry.manifestVersion())
-        assertEquals("2026-07-06T00:00:00Z", registry.generatedAt())
+        assertEquals("2026.07.07", registry.manifestVersion())
+        assertEquals("2026-07-07T00:00:00Z", registry.generatedAt())
         assertEquals(2, registry.profiles().size)
     }
 
@@ -21,10 +21,10 @@ class DriverRegistryTest {
     fun `finds profile by vendor and model case-insensitively`() {
         val registry = DefaultDriverRegistry(embeddedManifestLoader = ::loadEmbeddedCatalogResource)
 
-        val nokia = registry.findProfile("nokia", "g-1425g-a")
+        val nokia = registry.findProfile("nokia", "g-1425g-b")
         val tplink = registry.findProfile("TP-Link", "Archer C6")
 
-        assertEquals("nokia_g1425ga_v1", nokia?.profileId)
+        assertEquals("nokia_g1425gb_v1", nokia?.profileId)
         assertEquals("tplink_archer_c6_v1", tplink?.profileId)
     }
 
@@ -56,7 +56,7 @@ class DriverRegistryTest {
 
         assertTrue(result is CatalogSyncResult.Failed)
         assertEquals(2, registry.profiles().size)
-        assertEquals("2026.07.06", registry.manifestVersion())
+        assertEquals("2026.07.07", registry.manifestVersion())
     }
 
     @Test
@@ -66,6 +66,6 @@ class DriverRegistryTest {
         val result = registry.sync()
 
         assertTrue(result is CatalogSyncResult.NotAttempted)
-        assertEquals("2026.07.06", registry.manifestVersion())
+        assertEquals("2026.07.07", registry.manifestVersion())
     }
 }

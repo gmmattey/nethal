@@ -61,7 +61,7 @@ class FingerprintEngineTest {
         assertNull(result.vendor)
         assertNull(result.model)
         assertEquals(0.0, result.confidence, 0.0)
-        assertEquals("2026.07.06", result.manifestVersion)
+        assertEquals("2026.07.07", result.manifestVersion)
     }
 
     @Test
