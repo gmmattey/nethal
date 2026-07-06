@@ -72,6 +72,7 @@ internal class NokiaOntDriver(
                         wan = NokiaResponseParser.parseWanStatus(wanHtml),
                         ppp = NokiaResponseParser.parsePppStatus(pppJson),
                         deviceInfo = NokiaResponseParser.parseDeviceInfo(deviceJson),
+                        loginPageEvidence = client.loginPageEvidence,
                     ),
                 )
             } catch (e: NokiaLoginException) {

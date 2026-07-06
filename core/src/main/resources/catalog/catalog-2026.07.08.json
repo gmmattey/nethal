@@ -12,8 +12,8 @@
       "deviceType": "ONT",
       "family": "Nokia GPON RGW (Shanghai Bell / ex-Alcatel-Lucent)",
       "firmwareKnown": ["3FE49568IJJJ09 (softwareVersion) / 3FE49937ADAA (hardwareVersion)"],
-      "stage": "DRAFT",
-      "stageReason": "Diego não promove o próprio profile — a decisão de subir de DRAFT para READ_ONLY_ALPHA (ou além) é do Rafael, conforme papel de Product Owner do squad. O que muda nesta entrega é só a evidência: o Luiz executou `nokiaManualCheck` (SIG-333) com login e leitura autenticada reais, via `NokiaOntDriver.readSnapshot`, contra a unidade física, e capturou os 4 endpoints (GPON, WAN, PPP, DeviceInfo) com valores coerentes entre si (ex.: mesmo serialNumber em GPON e DeviceInfo, uptimes de WAN e PPP consistentes com sessão ativa, IP externo dentro de faixa CGNAT plausível para operadora brasileira). Isso satisfaz literalmente o critério documentado em compatibility-catalog.md para `DISCOVERY_ONLY → READ_ONLY_ALPHA`: 'pelo menos um teste real de leitura autenticada (modelo + firmware) documentado'. Recomendação de Diego para o Rafael: promover para READ_ONLY_ALPHA nesta rodada (ver seção de recomendação da resposta desta task) — mas o campo `stage` deste manifesto permanece DRAFT até o Rafael decidir, para não usurpar uma decisão que não é de Diego.",
+      "stage": "DISCOVERY_ONLY",
+      "stageReason": "Correção de sequência decidida pelo Rafael: o ciclo de vida é sequencial (DRAFT → DISCOVERY_ONLY → READ_ONLY_ALPHA → ...) e este profile nunca teve um probe passivo real documentado antes de autenticar — os campos `html_title`/`http_headers` de `fingerprintEvidence[]` continuavam `value: null` mesmo depois do login real de `nokiaManualCheck` (SIG-333). Como o handshake de `NokiaAuthenticationClient.login()` já fazia um GET real na raiz do equipamento (para extrair pubkey/nonce/csrf_token) sem nunca ter exposto título/headers como evidência, o profile tecnicamente já cumpriu 'contato de rede real e documentado' antes de autenticar — só faltava capturar e expor esse dado, não fazer uma chamada nova. Esta entrega expõe essa captura (`NokiaDriverSnapshot.loginPageEvidence` / `ManualCheckRunner`), então o profile agora formaliza `DISCOVERY_ONLY`. `stage` NÃO avança para READ_ONLY_ALPHA neste commit: os campos `html_title`/`http_headers` abaixo continuam `value: null` porque Diego não tem acesso a hardware físico — a captura só populará dado real quando o Luiz rodar `nokiaManualCheck` de novo (agora já instrumentado). Assim que esses dois campos tiverem valor real, e dado que a leitura autenticada dos 4 endpoints já foi validada previamente (ver `fingerprintEvidence[type=webui_menu_structure]`), a promoção para READ_ONLY_ALPHA pode acontecer no mesmo ciclo, por decisão do Rafael.",
       "physicalTestAccess": true,
       "physicalTestAccessNote": "Unidade física do Luiz, G-1425G-B. Primeiro teste real de leitura autenticada concluído com sucesso em 2026-07-06 via `nokiaManualCheck` (SIG-333) — login RSA+AES completo e os 4 endpoints (GPON/WAN/PPP/DeviceInfo) lidos e coerentes. Falta, para estágios seguintes: mais de uma execução (idealmente em dias/horários diferentes, para checar estabilidade de sessão), e teste de comportamento de erro (ex.: sessão expirada, err_t=2) contra a unidade real, hoje só coberto por fakes.",
       "managementDefaults": {
@@ -68,16 +68,16 @@
           "value": null,
           "confidence": 0.0,
           "confidenceLevel": "NONE_VERIFIED",
-          "source": "`nokiaManualCheck` (SIG-333) não captura/loga o `<title>` da página de login — foco do check é a leitura autenticada dos 4 endpoints, não fingerprint passivo de HTML.",
-          "note": "Não inventar valor. Campo permanece null; captura de título fica para um probe passivo dedicado, se algum dia for priorizado."
+          "source": "`NokiaAuthenticationClient.login()` já faz um GET real na raiz do equipamento (para extrair pubkey/nonce/csrf_token) e, a partir desta entrega, também captura o `<title>` desse HTML em `loginPageEvidence` — mas a execução de `nokiaManualCheck` (SIG-333) usada para preencher este manifesto é ANTERIOR a essa instrumentação, então o valor real ainda não foi capturado.",
+          "note": "Não inventar valor. Pendente: nova execução de `nokiaManualCheck` (mesmo comando de sempre) contra a unidade física, agora exibindo o título capturado no bloco 'Evidência de fingerprint (Tela de login)' do output. Assim que o Luiz rodar e reportar o valor, este campo é atualizado com `value` real e `confidenceLevel` recalculado."
         },
         {
           "type": "http_headers",
           "value": null,
           "confidence": 0.0,
           "confidenceLevel": "NONE_VERIFIED",
-          "source": "`nokiaManualCheck` não loga headers HTTP brutos da resposta.",
-          "note": "Campo permanece null. Não afeta a autenticação, já bem evidenciada por outras entradas."
+          "source": "Mesma captura do GET de login descrita acima — `NokiaAuthenticationClient.login()` agora também expõe o header `Server` da resposta em `loginPageEvidence`, mas a execução de `nokiaManualCheck` usada para este manifesto antecede essa instrumentação.",
+          "note": "Pendente: nova execução de `nokiaManualCheck` para capturar o header `Server` real (se o firmware o expuser). Não afeta a autenticação, já bem evidenciada por outras entradas — só falta este dado de fingerprint passivo para fechar o critério de `DISCOVERY_ONLY` com evidência completa."
         }
       ],
       "expectedProtocols": [

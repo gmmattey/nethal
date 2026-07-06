@@ -46,12 +46,26 @@ internal class NokiaAuthenticationClient(
     private var legacySessionId: String = ""
     private var language: String = "eng"
 
+    /**
+     * Evidência de fingerprint passivo (título HTML, header `Server`) capturada do mesmo GET na
+     * raiz que `login()` já faz para extrair `pubkey`/`nonce`/`csrf_token` — nenhuma chamada de
+     * rede extra. Fica populada após uma tentativa de `login()`, mesmo que ela falhe depois
+     * (o GET da página de login acontece antes da tentativa de autenticação em si).
+     */
+    var loginPageEvidence: NokiaLoginPageEvidence? = null
+        private set
+
     val isAuthenticated: Boolean get() = sessionId.isNotEmpty()
 
     @Throws(IOException::class)
     fun login(username: String, password: String) {
         val loginPage = transport.get("$baseUrl/?t=${clock()}&lang=eng")
         val html = loginPage.body
+
+        loginPageEvidence = NokiaLoginPageEvidence(
+            httpTitle = extractLoginPageTitle(html),
+            serverHeader = loginPage.headers["server"],
+        )
 
         val publicKeyBase64 = NokiaAuthCrypto.extractPublicKeyBase64(html)
             ?: throw IOException("pubkey nao encontrado na pagina de login")
@@ -123,3 +137,13 @@ internal class NokiaAuthenticationClient(
         )
     }
 }
+
+/**
+ * Equivalente local a `extractHtmlTitle` de `HttpFingerprintProbe.kt` (pacote `fingerprint`,
+ * `internal` lá e portanto não visível aqui) — mesma regex, evitando acoplar o driver Nokia a um
+ * pacote de probe de discovery só por causa de uma função utilitária de uma linha.
+ */
+private val LOGIN_PAGE_TITLE_REGEX = Regex("<title[^>]*>(.*?)</title>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+
+private fun extractLoginPageTitle(html: String): String? =
+    LOGIN_PAGE_TITLE_REGEX.find(html)?.groupValues?.get(1)?.trim()?.takeIf(String::isNotEmpty)

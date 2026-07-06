@@ -59,6 +59,11 @@ fun main(args: Array<String>) {
             println(snapshot.ppp?.toString() ?: "(não disponível / falha ao interpretar resposta)")
             println("--- Device Info ---")
             println(snapshot.deviceInfo?.toString() ?: "(não disponível / falha ao interpretar resposta)")
+            println("--- Evidência de fingerprint (Tela de login) ---")
+            val evidence = snapshot.loginPageEvidence
+            println("Título HTML: ${evidence?.httpTitle ?: "(não capturado)"}")
+            println("Header Server: ${evidence?.serverHeader ?: "(não capturado / ausente na resposta)"}")
+            println("(dados não sensíveis — sem credencial; copie estes dois valores para o catálogo de compatibilidade)")
         }
         is NokiaDriverResult.Failure -> {
             println("Falha: ${result.reason} — ${result.message}")

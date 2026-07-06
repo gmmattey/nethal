@@ -266,15 +266,32 @@ contra a unidade física. Isso é declarado explicitamente no manifesto (`value:
 
 ## Changelog
 
+- **2026-07-08 (correção de sequência de estágio, decisão do Rafael)** — O `stage` do profile
+  `nokia_g1425gb_v1` avançou incorretamente na entrega anterior deste mesmo dia: o critério
+  documentado de `DRAFT → DISCOVERY_ONLY` (primeiro probe passivo real, título HTML e headers
+  capturados) nunca havia sido cumprido — os campos `html_title`/`http_headers` de
+  `fingerprintEvidence[]` continuavam `value: null` mesmo após o login autenticado real de
+  `nokiaManualCheck`. Rafael determinou que o ciclo é sequencial e não pode pular etapas: "
+  `DISCOVERY_ONLY` não é sobre completude da evidência, é sobre ter havido contato de rede real e
+  documentado antes de autenticar". Correção aplicada: `NokiaAuthenticationClient.login()` já fazia
+  um GET real na raiz do equipamento (para extrair `pubkey`/`nonce`/`csrf_token`) — este GET agora
+  também expõe título HTML e header `Server` como `NokiaDriverSnapshot.loginPageEvidence`
+  (`NokiaModels.kt`), impresso pelo `ManualCheckRunner` como "Evidência de fingerprint (Tela de
+  login)". Não é uma chamada de rede nova, só exposição de dado já obtido em memória. Com isso, o
+  `stage` do profile passa a `DISCOVERY_ONLY` (não `READ_ONLY_ALPHA`) nesta correção — os campos
+  `html_title`/`http_headers` continuam `value: null` no manifesto até o Luiz rodar
+  `nokiaManualCheck` novamente (mesmo comando de sempre) e reportar o título/header reais
+  capturados pela nova instrumentação. Assim que isso acontecer, e dado que a leitura autenticada
+  dos 4 endpoints já está validada por execução anterior, a promoção para `READ_ONLY_ALPHA` pode
+  ocorrer no mesmo ciclo, por decisão do Rafael.
 - **2026-07-08** — Primeira leitura autenticada real do próprio NetHAL contra a unidade física
-  Nokia G-1425G-B, via `nokiaManualCheck` (SIG-333), fechando o critério documentado para
-  `DISCOVERY_ONLY → READ_ONLY_ALPHA`. Novo manifesto `catalog-2026.07.08.json`
+  Nokia G-1425G-B, via `nokiaManualCheck` (SIG-333), fechando parcialmente o critério documentado
+  para `DISCOVERY_ONLY → READ_ONLY_ALPHA` (ver correção de sequência acima — o probe passivo de
+  `DISCOVERY_ONLY` ainda faltava). Novo manifesto `catalog-2026.07.08.json`
   (`previousManifest: catalog-2026.07.07.json`): `firmwareKnown` do profile `nokia_g1425gb_v1`
   passa a incluir `softwareVersion=3FE49568IJJJ09` / `hardwareVersion=3FE49937ADAA`; as 5
   capabilities de leitura sobem de `EXPERIMENTAL` para `AVAILABLE`; `confidenceScoreOverall` sobe
-  de `0.55` para `0.85` (recálculo item a item na nota do próprio manifesto). `stage` do profile
-  mantido em `DRAFT` deliberadamente — a promoção de estágio é decisão do Rafael, não de Diego;
-  recomendação de promoção para `READ_ONLY_ALPHA` fica registrada no `stageReason`. Documentada
+  de `0.55` para `0.85` (recálculo item a item na nota do próprio manifesto). Documentada
   nota de mapeamento `manufacturer=ALCL` (herança Alcatel-Lucent) vs. nome comercial `Nokia`.
 - **2026-07-07** — Corrigido modelo Nokia de `G-1425G-A` para `G-1425G-B` (a unidade física de
   teste do NetHAL, confirmada pelo Luiz, é o G-1425G-B; o manifesto anterior pesquisou o modelo

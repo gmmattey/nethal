@@ -52,10 +52,23 @@ data class NokiaDeviceInfo(
     val uptimeSeconds: Long,
 )
 
+/**
+ * Evidência de fingerprint passivo (título HTML e header `Server`) da própria página de login,
+ * já obtida pelo GET que `NokiaAuthenticationClient.login()` faz na raiz do equipamento para
+ * extrair `pubkey`/`nonce`/`csrf_token` — não é uma nova chamada de rede, só a exposição de um
+ * dado que já existia em memória durante o handshake. Nenhum dos dois campos é sensível
+ * (não é credencial): título de página e header de servidor HTTP.
+ */
+data class NokiaLoginPageEvidence(
+    val httpTitle: String?,
+    val serverHeader: String?,
+)
+
 /** Snapshot agregado dos 4 endpoints de leitura, retornado pelo orquestrador do driver. */
 data class NokiaDriverSnapshot(
     val gpon: NokiaGponStatus?,
     val wan: NokiaWanStatus?,
     val ppp: NokiaPppStatus?,
     val deviceInfo: NokiaDeviceInfo?,
+    val loginPageEvidence: NokiaLoginPageEvidence? = null,
 )
