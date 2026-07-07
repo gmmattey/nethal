@@ -60,9 +60,6 @@ internal object TpLinkStokLuciResponseParser {
     private data class LoginResponseEnvelope(val data: String? = null)
 
     @Serializable
-    private data class DecryptedLoginPayload(val stok: String? = null)
-
-    @Serializable
     internal data class DecryptedLoginErrorData(
         val failureCount: Int? = null,
         val attemptsAllowed: Int? = null,
@@ -71,6 +68,18 @@ internal object TpLinkStokLuciResponseParser {
     @Serializable
     internal data class DecryptedLoginEnvelope(
         val stok: String? = null,
+        val success: Boolean? = null,
+        @SerialName("errorcode") val errorCode: String? = null,
+        val data: DecryptedLoginSuccessData? = null,
+    )
+
+    @Serializable
+    internal data class DecryptedLoginSuccessData(
+        val stok: String? = null,
+    )
+
+    @Serializable
+    internal data class DecryptedLoginErrorEnvelope(
         val success: Boolean? = null,
         @SerialName("errorcode") val errorCode: String? = null,
         val data: DecryptedLoginErrorData? = null,
@@ -113,13 +122,13 @@ internal object TpLinkStokLuciResponseParser {
 
     /** Extrai o `stok` do JSON decifrado (texto plano) do payload de login bem-sucedido. `null` se ausente/malformado. */
     fun parseDecryptedStok(decryptedJson: String): String? {
-        val parsed = runCatching { json.decodeFromString(DecryptedLoginPayload.serializer(), decryptedJson) }.getOrNull()
-        return parsed?.stok?.takeIf { it.isNotBlank() }
+        val parsed = runCatching { json.decodeFromString(DecryptedLoginEnvelope.serializer(), decryptedJson) }.getOrNull()
+        return listOf(parsed?.stok, parsed?.data?.stok).firstOrNull { !it.isNullOrBlank() }
     }
 
     /** Lê o envelope JSON já decifrado de `form=login`, quando ele representa erro ou sucesso sem `stok`. */
-    fun parseDecryptedLoginEnvelope(decryptedJson: String): DecryptedLoginEnvelope? =
-        runCatching { json.decodeFromString(DecryptedLoginEnvelope.serializer(), decryptedJson) }.getOrNull()
+    fun parseDecryptedLoginEnvelope(decryptedJson: String): DecryptedLoginErrorEnvelope? =
+        runCatching { json.decodeFromString(DecryptedLoginErrorEnvelope.serializer(), decryptedJson) }.getOrNull()
 }
 
 /** Vocabulário `err_code` observado em respostas de erro deste protocolo, quando presente no corpo (campo top-level `error_code`). */

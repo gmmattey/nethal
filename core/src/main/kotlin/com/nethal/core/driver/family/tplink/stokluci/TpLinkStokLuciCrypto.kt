@@ -234,6 +234,17 @@ internal object TpLinkStokLuciCrypto {
     }
 
     /**
+     * Texto plano do envelope `sign` de uma chamada autenticada pós-login: `h=<hash>&s=<seq +
+     * comprimento_base64_do_data>`. Diferente do login inicial, as chamadas autenticadas reais não
+     * repetem `k=`/`i=` no `sign`; elas reutilizam a chave/IV AES da sessão já estabelecida.
+     */
+    fun buildAuthenticatedSignPlaintext(
+        hash: String,
+        seq: Long,
+        encryptedDataBase64Length: Int,
+    ): String = "h=$hash&s=${seq + encryptedDataBase64Length}"
+
+    /**
      * Extrai o valor de `sysauth` do header `Set-Cookie` bruto, se presente. A evidência ao vivo
      * desta rodada não capturou headers de resposta (só corpo) — mantido por compatibilidade com o
      * mecanismo antigo, mas o login não deve depender só deste cookie (ver

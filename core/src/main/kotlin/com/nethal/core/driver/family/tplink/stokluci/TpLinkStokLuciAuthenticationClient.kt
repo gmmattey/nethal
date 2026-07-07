@@ -105,10 +105,19 @@ internal class TpLinkStokLuciAuthenticationClient(
     private val rsaChunkSizeBytes: Int = TpLinkStokLuciCrypto.DEFAULT_RSA_CHUNK_SIZE_BYTES,
 ) : AuthenticationStrategy<TpLinkStokLuciSession> {
 
+    private data class SessionEncryptorContext(
+        val aesKey: ByteArray,
+        val aesIv: ByteArray,
+        val signHash: String,
+        val signKey: TpLinkStokLuciRsaKey,
+        val seq: Long,
+    )
+
     private val baseUrl = "http://$host"
     private val loginBaseUrl = "$baseUrl/cgi-bin/luci/;stok=/login"
 
     private var session: TpLinkStokLuciSession? = null
+    private var encryptorContext: SessionEncryptorContext? = null
 
     val isAuthenticated: Boolean get() = session != null
 
@@ -243,11 +252,18 @@ internal class TpLinkStokLuciAuthenticationClient(
 
         val newSession = TpLinkStokLuciSession(stok = stok, sysauthCookie = sysauthCookie)
         session = newSession
+        encryptorContext = SessionEncryptorContext(
+            aesKey = aesKey.copyOf(),
+            aesIv = aesIv.copyOf(),
+            signHash = TpLinkStokLuciCrypto.md5Hex(username + password),
+            signKey = parsedAuthKeys.key,
+            seq = parsedAuthKeys.seq,
+        )
         return newSession
     }
 
     override fun authenticatedHeaders(session: TpLinkStokLuciSession): Map<String, String> =
-        session.sysauthCookie?.let { mapOf("Cookie" to "sysauth=$it") } ?: emptyMap()
+        session.sysauthCookie?.let { mapOf("sysauth" to it) } ?: emptyMap()
 
     /**
      * Faz uma chamada de dados autenticada contra `{host}/cgi-bin/luci/;stok=<token>/<path>`,
@@ -259,8 +275,62 @@ internal class TpLinkStokLuciAuthenticationClient(
     fun fetchAuthenticated(path: String, query: String): String {
         val currentSession = session
         check(currentSession != null) { "fetchAuthenticated chamado antes de login() bem-sucedido" }
-        val url = "$baseUrl/cgi-bin/luci/;stok=${currentSession.stok}/$path?$query"
-        val response = transport.post(url, "operation=read", authenticatedHeaders(currentSession))
-        return response.body
+        val currentEncryptor = encryptorContext
+        check(currentEncryptor != null) { "fetchAuthenticated chamado sem contexto criptografico de sessao" }
+
+        val requestPlaintext = extractRequestPlaintext(query)
+        val requestQuery = extractRequestQuery(query)
+        val encryptedData = TpLinkStokLuciCrypto.aesCbcEncrypt(
+            currentEncryptor.aesKey,
+            currentEncryptor.aesIv,
+            requestPlaintext.toByteArray(Charsets.UTF_8),
+        )
+        val dataBase64 = TpLinkStokLuciCrypto.base64Encode(encryptedData)
+        val signPlaintext = TpLinkStokLuciCrypto.buildAuthenticatedSignPlaintext(
+            hash = currentEncryptor.signHash,
+            seq = currentEncryptor.seq,
+            encryptedDataBase64Length = dataBase64.length,
+        )
+        val signHex = TpLinkStokLuciCrypto.rsaEncryptChunkedToHex(
+            modulusHex = currentEncryptor.signKey.modulusHex,
+            exponentHex = currentEncryptor.signKey.exponentHex,
+            plaintext = signPlaintext,
+            chunkSizeBytes = rsaChunkSizeBytes,
+        )
+        val encodedData = java.net.URLEncoder.encode(dataBase64, "UTF-8")
+        val requestBody = "sign=$signHex&data=$encodedData"
+        val url = "$baseUrl/cgi-bin/luci/;stok=${currentSession.stok}/$path?$requestQuery"
+        val response = transport.post(url, requestBody, authenticatedHeaders(currentSession))
+        if (response.statusCode != 200) {
+            throw TpLinkStokLuciLoginException(
+                TpLinkStokLuciLoginFailureReason.UNEXPECTED_RESPONSE,
+                "leitura autenticada falhou: status=${response.statusCode}",
+            )
+        }
+        val ciphertextBase64 = TpLinkStokLuciResponseParser.parseLoginCiphertextBase64(response.body)
+            ?: throw TpLinkStokLuciLoginException(
+                TpLinkStokLuciLoginFailureReason.UNEXPECTED_RESPONSE,
+                "leitura autenticada falhou: resposta sem campo data cifrado",
+            )
+        val decryptedBytes = TpLinkStokLuciCrypto.aesCbcDecrypt(
+            currentEncryptor.aesKey,
+            currentEncryptor.aesIv,
+            TpLinkStokLuciCrypto.base64Decode(ciphertextBase64),
+        )
+        return String(decryptedBytes, Charsets.UTF_8)
+    }
+
+    private fun extractRequestPlaintext(query: String): String {
+        val operationValue = Regex("""(?:^|&)operation=([^&]+)""").find(query)?.groupValues?.get(1)
+            ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+        return if (operationValue.isNullOrBlank()) "operation=read" else "operation=$operationValue"
+    }
+
+    private fun extractRequestQuery(query: String): String {
+        val filtered = query
+            .split('&')
+            .filter { it.isNotBlank() && !it.startsWith("operation=") }
+            .joinToString("&")
+        return if (filtered.isBlank()) "form=all" else filtered
     }
 }

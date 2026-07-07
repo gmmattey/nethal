@@ -43,26 +43,23 @@
       "signPlaintext": "k=5945270769887026&i=3257785177414969&h=f6fdffe48c908deb0f4c3bd36c032e72&s=855135262",
       "hLength": 32,
       "hAlgorithmInference": "MD5 hex",
-      "browserCapturedFailedLoginResponsePlaintext": "{\"errorcode\":\"login failed\",\"success\":false,\"data\":{\"failureCount\":1,\"attemptsAllowed\":9}}"
+      "browserCapturedSuccessfulLoginResponsePlaintext": "{\"success\":true,\"data\":{\"stok\":\"d49c7a5f81c94725e74f4afb369df95c\"}}",
+      "browserCapturedStatusAllRequestBodyShape": "sign=<rsa512_hex>&data=<urlencoded_base64_aes_cbc_of_operation=read>",
+      "browserCapturedStatusAllResponseShape": "{\"data\":\"<base64>\"} -> decrypts to {\"success\":true,\"data\":{...}}"
     }
   },
   "currentDriverStatus": {
-    "previousFailure": "HTTP 403 INVALID_CREDENTIALS caused by h being calculated as md5(password) and s not matching firmware formula",
-    "currentObservedBehavior": "Driver now reaches HTTP 200 on form=login against real hardware. In one tested run, the browser itself decrypted the firmware response as login failed with failureCount=1 and attemptsAllowed=9",
-    "likelyInterpretation": "The outer HTTP handshake and sign/data envelope are substantially aligned. The remaining blocker on the tested unit is more likely the current credential than the transport layer itself",
+    "previousFailure": "Older driver versions failed first with HTTP 403 INVALID_CREDENTIALS because h was implemented incorrectly, then failed again after login because the decrypted stok shape and sysauth cookie forwarding were implemented incorrectly",
+    "currentObservedBehavior": "Live validation on 2026-07-07 with the real credential admin succeeded in both login and authenticated status read against the real Archer C6 unit",
+    "likelyInterpretation": "The current driver is aligned with the real hardware for login plus authenticated read of admin/status?form=all",
     "credentialFinding": {
-      "note": "Tested credential value intentionally not recorded here — never persist router credentials, tested or real, in version-controlled files (see SECURITY.md).",
-      "browserDecryptedResult": {
-        "errorcode": "login failed",
-        "success": false,
-        "failureCount": 1,
-        "attemptsAllowed": 9
-      }
+      "note": "The real credential used during live validation was supplied out of band by the device owner and is not persisted here."
     }
   },
   "confirmedReadEndpointsWithoutFullCapabilityMapping": [
     "/cgi-bin/luci/;stok=/login?form=keys",
     "/cgi-bin/luci/;stok=/login?form=auth",
-    "/cgi-bin/luci/;stok=/login?form=login"
+    "/cgi-bin/luci/;stok=/login?form=login",
+    "/cgi-bin/luci/;stok=<token>/admin/status?form=all"
   ]
 }

@@ -344,7 +344,12 @@ private fun runTplinkC6Stok(ip: String, username: String) {
             ),
             postRefererProvider = { url ->
                 val base = URL(url)
-                "${base.protocol}://${base.host}${if (base.port !in listOf(-1, 80, 443)) ":${base.port}" else ""}/webpages/login.html?t=1693386897767"
+                val root = "${base.protocol}://${base.host}${if (base.port !in listOf(-1, 80, 443)) ":${base.port}" else ""}"
+                if (url.contains("/cgi-bin/luci/;stok=/login")) {
+                    "$root/webpages/login.html?t=1693386897767"
+                } else {
+                    "$root/webpages/index.1693386897767.html"
+                }
             },
             followRedirectsManually = false,
         ),

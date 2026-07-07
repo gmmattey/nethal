@@ -33,6 +33,20 @@ class TpLinkStokLuciAuthenticationClientTest {
     }
 
     @Test
+    fun `login extracts stok from the real captured success shape success plus data plus stok`() {
+        val transport = FakeTpLinkStokLuciHttpTransport(
+            keysResponse = passwordKeySuccessResponse(),
+            authResponse = authSuccessResponse(),
+            simulateRealServerEncryptedLoginPayload = """{"success":true,"data":{"stok":"nested-token-123"}}""",
+        )
+        val client = TpLinkStokLuciAuthenticationClient("192.168.0.1", transport)
+
+        val session = client.login("admin", "admin")
+
+        assertEquals("nested-token-123", session.stok)
+    }
+
+    @Test
     fun `login generates a 16-decimal-digit AES key and IV used directly as bytes, never random binary hex - EncryptionWrapperMR variant`() {
         // O fake decifra o envelope sign com a chave RSA privada de teste de assinatura e expoe os
         // digitos k=/i= extraidos - se o roundtrip completo (que inclui o servidor fake decifrando a
@@ -267,6 +281,22 @@ class TpLinkStokLuciAuthenticationClientTest {
 
         val statusUrl = transport.postedUrls.last()
         assertTrue(statusUrl.contains(";stok=tok999/admin/status"))
-        assertTrue(statusUrl.contains("form=all&operation=read"))
+        assertTrue(statusUrl.contains("form=all"))
+    }
+
+    @Test
+    fun `fetchAuthenticated reuses the authenticated sign plus data envelope and returns decrypted plaintext`() {
+        val transport = FakeTpLinkStokLuciHttpTransport(
+            simulateRealServerStok = "tok999",
+            statusResponse = HttpTransportResponse(200, """{"success":true,"data":{"status":"ok"}}""", emptyMap(), emptyMap()),
+        )
+        val client = TpLinkStokLuciAuthenticationClient("192.168.0.1", transport)
+        client.login("admin", "admin")
+
+        val plaintext = client.fetchAuthenticated("admin/status", "form=all&operation=read")
+
+        assertEquals("""{"success":true,"data":{"status":"ok"}}""", plaintext)
+        assertTrue(transport.lastAuthenticatedRequestBody!!.startsWith("sign="))
+        assertTrue(transport.lastAuthenticatedRequestBody!!.contains("&data="))
     }
 }

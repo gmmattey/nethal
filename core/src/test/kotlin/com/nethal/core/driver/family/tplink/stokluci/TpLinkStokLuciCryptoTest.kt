@@ -117,6 +117,19 @@ class TpLinkStokLuciCryptoTest {
     }
 
     @Test
+    fun `buildAuthenticatedSignPlaintext matches the real post-login envelope shape without k and i`() {
+        val plaintext = TpLinkStokLuciCrypto.buildAuthenticatedSignPlaintext(
+            hash = "f6fdffe48c908deb0f4c3bd36c032e72",
+            seq = 569536341L,
+            encryptedDataBase64Length = 24,
+        )
+
+        assertEquals("h=f6fdffe48c908deb0f4c3bd36c032e72&s=569536365", plaintext)
+        assertTrue(!plaintext.contains("k="))
+        assertTrue(!plaintext.contains("i="))
+    }
+
+    @Test
     fun `extractSysauthCookie parses value from a raw Set-Cookie header with other attributes`() {
         val value = TpLinkStokLuciCrypto.extractSysauthCookie("sysauth=deadbeef1234; Path=/; HttpOnly")
         assertEquals("deadbeef1234", value)

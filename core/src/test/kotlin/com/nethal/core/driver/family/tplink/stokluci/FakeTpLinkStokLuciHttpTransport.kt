@@ -50,6 +50,8 @@ internal class FakeTpLinkStokLuciHttpTransport(
         private set
     var lastCapturedSignHash: String? = null
         private set
+    var lastAuthenticatedRequestBody: String? = null
+        private set
 
     override fun get(url: String, extraHeaders: Map<String, String>): HttpTransportResponse =
         HttpTransportResponse(404, "", emptyMap(), emptyMap())
@@ -70,7 +72,13 @@ internal class FakeTpLinkStokLuciHttpTransport(
                     else -> loginResponse ?: HttpTransportResponse(404, "", emptyMap(), emptyMap())
                 }
             }
-            else -> statusResponse ?: HttpTransportResponse(200, "{}", emptyMap(), emptyMap())
+            else -> {
+                lastAuthenticatedRequestBody = body
+                when {
+                    simulateRealServerStok != null -> simulateAuthenticatedReadResponse(body)
+                    else -> statusResponse ?: HttpTransportResponse(200, "{}", emptyMap(), emptyMap())
+                }
+            }
         }
     }
 
@@ -107,6 +115,22 @@ internal class FakeTpLinkStokLuciHttpTransport(
         val aesIv = aesIvDigits.toByteArray(Charsets.US_ASCII)
         val ciphertextBase64 = encryptLoginResponsePayload(aesKey, aesIv, encryptedPayloadJson)
 
+        return HttpTransportResponse(200, """{"data":"$ciphertextBase64"}""", emptyMap(), emptyMap())
+    }
+
+    private fun simulateAuthenticatedReadResponse(requestBody: String): HttpTransportResponse {
+        val signHex = Regex("""sign=([0-9a-f]+)""").find(requestBody)?.groupValues?.get(1)
+            ?: return HttpTransportResponse(400, "", emptyMap(), emptyMap())
+        val signPlaintext = decryptRsaChunked(signHex, TestSignKeyFixture.MODULUS_HEX, TestSignKeyFixture.PRIVATE_EXPONENT_HEX)
+        lastCapturedSignHash = Regex("""h=([0-9a-f]+)""").find(signPlaintext)?.groupValues?.get(1)
+
+        val aesKeyDigits = lastCapturedAesKeyDigits ?: return HttpTransportResponse(400, "", emptyMap(), emptyMap())
+        val aesIvDigits = lastCapturedAesIvDigits ?: return HttpTransportResponse(400, "", emptyMap(), emptyMap())
+        val aesKey = aesKeyDigits.toByteArray(Charsets.US_ASCII)
+        val aesIv = aesIvDigits.toByteArray(Charsets.US_ASCII)
+
+        val payload = statusResponse?.body ?: """{"success":true,"data":{"status":"ok"}}"""
+        val ciphertextBase64 = encryptLoginResponsePayload(aesKey, aesIv, payload)
         return HttpTransportResponse(200, """{"data":"$ciphertextBase64"}""", emptyMap(), emptyMap())
     }
 
