@@ -298,11 +298,15 @@ private fun runTplinkC20(ip: String, username: String) {
 }
 
 // --- TP-Link Archer C6, plataforma stok/luci (tplink_archer_c6_stok_v1) — via DriverRegistry/DriverFamilyRegistry. ---
-// ATENÇÃO: este mecanismo NUNCA foi testado contra hardware real. O entendimento do protocolo vem
-// de pesquisa em código aberto de terceiros (pacote `tplinkrouterc6u`, GPL-3.0) — ver KDoc de
-// TpLinkStokLuciAuthenticationClient. O profile continua DISCOVERY_ONLY até este runner produzir
-// o primeiro teste real bem-sucedido; qualquer falha aqui deve ser documentada no catálogo
-// (fingerprintEvidence[] com confidenceLevel apropriado), nunca contornada manualmente.
+// ATENÇÃO: a implementação anterior (baseada só em leitura do pacote Python `tplinkrouterc6u`,
+// GPL-3.0) foi testada contra o hardware real do Luiz e falhou com INVALID_CREDENTIALS (HTTP 403)
+// mesmo com senha correta. O protocolo foi corrigido a partir de evidência ao vivo (interceptação
+// de XMLHttpRequest em login real bem-sucedido + leitura estrutural dos scripts JS reais do
+// equipamento) — ver KDoc de TpLinkStokLuciAuthenticationClient/TpLinkStokLuciCrypto para o detalhe
+// e as suposições que ainda restam sem confirmação byte a byte. O profile continua DISCOVERY_ONLY
+// até este runner produzir o primeiro teste real bem-sucedido com a implementação corrigida;
+// qualquer falha aqui deve ser documentada no catálogo (fingerprintEvidence[] com confidenceLevel
+// apropriado), nunca contornada manualmente.
 
 private fun runTplinkC6Stok(ip: String, username: String) {
     val password = readPasswordInteractively("TP-Link Archer C6 (plataforma stok/luci)")
@@ -322,7 +326,7 @@ private fun runTplinkC6Stok(ip: String, username: String) {
     }
 
     println("Conectando em $ip como \"$username\" (profile=${profile.profileId}, driverFamilyId=${profile.driverFamilyId})...")
-    println("AVISO: este mecanismo nunca foi validado contra hardware real — protocolo entendido só por pesquisa de terceiros (tplinkrouterc6u, GPL-3.0). Reporte o resultado (sucesso ou falha) para atualizar o catálogo.")
+    println("AVISO: protocolo corrigido a partir de evidência ao vivo (login real interceptado + leitura de JS do equipamento) após a implementação anterior falhar com INVALID_CREDENTIALS contra o hardware real. Ainda restam suposições não confirmadas byte a byte (ver KDoc de TpLinkStokLuciCrypto). Reporte o resultado (sucesso ou falha) para atualizar o catálogo.")
 
     val driverFamilyRegistry = defaultDriverFamilyRegistry()
     val httpTransport = DefaultHttpTransport(

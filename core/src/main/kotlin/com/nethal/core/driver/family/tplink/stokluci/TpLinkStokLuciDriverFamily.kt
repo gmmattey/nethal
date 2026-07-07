@@ -37,15 +37,18 @@ internal sealed interface TpLinkStokLuciStatusOutcome {
  * Driver Family da plataforma `tplink-stok-luci` (`platformId`/`driverFamilyId` do catálogo —
  * profile `tplink_archer_c6_stok_v1`, ver `docs/architecture/hal-layering-model.md` §9.1).
  *
- * Implementa só o login (passos 1-5 do handshake, ver [TpLinkStokLuciAuthenticationClient]) mais
- * uma leitura autenticada simples de status geral — a etapa de chamadas autenticadas com envelope
- * AES/assinatura RSA completo (necessária para a maioria dos endpoints de leitura estruturada)
- * fica fora de escopo desta entrega, documentada como próximo passo.
+ * Implementa só o login (envelope `sign`/`data`, ver [TpLinkStokLuciAuthenticationClient] para o
+ * protocolo real confirmado por evidência ao vivo) mais uma leitura autenticada simples de status
+ * geral — a etapa de chamadas autenticadas estruturadas por capability (necessária para a maioria
+ * dos endpoints de leitura) fica fora de escopo desta entrega, documentada como próximo passo.
  *
- * **Nunca testado contra hardware real.** Profile permanece `DISCOVERY_ONLY` até um teste real de
- * login bem-sucedido contra a unidade física do Luiz — este código existe, mas não tem prova de
- * funcionamento além dos testes com fake de transporte. Ver `ManualCheckRunner` para o comando de
- * teste manual quando isso acontecer.
+ * **Primeiro teste real contra o hardware do Luiz deu `INVALID_CREDENTIALS` (HTTP 403)** com a
+ * implementação anterior (baseada só em leitura da lib Python `tplinkrouterc6u`, nunca testada).
+ * Esta versão corrige o protocolo a partir de evidência ao vivo (interceptação de `XMLHttpRequest`
+ * em login real bem-sucedido + leitura estrutural dos scripts JS reais do equipamento), mas ainda
+ * carrega suposições não confirmadas byte a byte (ver KDoc de [TpLinkStokLuciCrypto]) — profile
+ * permanece `DISCOVERY_ONLY` até o próximo teste real confirmar login bem-sucedido. Ver
+ * `ManualCheckRunner` para o comando de teste manual.
  *
  * Guarda de SSRF obrigatória (RFC 1918), mesma classe de risco de toda Driver Family do NetHAL —
  * falha rápido, sem tentar login, quando o host não é IP privado.
@@ -81,7 +84,7 @@ internal class TpLinkStokLuciDriverFamily(
             onLoginFailure = { e ->
                 when (e.reason) {
                     TpLinkStokLuciLoginFailureReason.INVALID_CREDENTIALS -> TpLinkStokLuciFailureReason.INVALID_CREDENTIALS
-                    TpLinkStokLuciLoginFailureReason.KEYS_ENDPOINT_UNAVAILABLE,
+                    TpLinkStokLuciLoginFailureReason.AUTH_ENDPOINT_UNAVAILABLE,
                     TpLinkStokLuciLoginFailureReason.UNEXPECTED_RESPONSE,
                     -> null
                 }
@@ -113,7 +116,7 @@ internal class TpLinkStokLuciDriverFamily(
             onLoginFailure = { e ->
                 when (e.reason) {
                     TpLinkStokLuciLoginFailureReason.INVALID_CREDENTIALS -> TpLinkStokLuciFailureReason.INVALID_CREDENTIALS
-                    TpLinkStokLuciLoginFailureReason.KEYS_ENDPOINT_UNAVAILABLE,
+                    TpLinkStokLuciLoginFailureReason.AUTH_ENDPOINT_UNAVAILABLE,
                     TpLinkStokLuciLoginFailureReason.UNEXPECTED_RESPONSE,
                     -> null
                 }

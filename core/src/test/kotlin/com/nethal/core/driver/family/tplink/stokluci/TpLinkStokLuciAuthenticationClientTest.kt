@@ -8,20 +8,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Testes do mecanismo de autenticação da plataforma `tplink-stok-luci`, entendido por pesquisa
- * em código aberto de terceiros (pacote `tplinkrouterc6u`, GPL-3.0) — ver KDoc de
- * [TpLinkStokLuciAuthenticationClient] para a citação completa. **Nunca testado contra hardware
- * real** — estes testes validam só o comportamento desta implementação contra fakes de
- * transporte, não confirmam o protocolo real do equipamento.
+ * Testes do mecanismo de autenticação da plataforma `tplink-stok-luci`, corrigido a partir de
+ * evidência ao vivo **definitiva** (terceira rodada, 2026-07-07): captura via Playwright, com
+ * `page.on('response')` interceptando o corpo completo de request E response de cada chamada
+ * `cgi-bin/luci` durante um login real bem-sucedido contra o hardware físico do Luiz (Archer C6
+ * v2.0, firmware `1.1.10 Build 20230830 rel.69433(5553)`). Ver KDoc de
+ * [TpLinkStokLuciAuthenticationClient] para o detalhe completo do protocolo e o que ainda não está
+ * confirmado byte a byte.
  */
 class TpLinkStokLuciAuthenticationClientTest {
 
     @Test
-    fun `login succeeds and extracts stok and sysauth cookie from a well-formed response`() {
+    fun `login succeeds and extracts stok via full round-trip through a simulated real server`() {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
-            authResponse = authSuccessResponse(),
-            loginResponse = loginSuccessResponse(stok = "mytoken123"),
+            simulateRealServerStok = "mytoken123",
         )
         val client = TpLinkStokLuciAuthenticationClient("192.168.0.1", transport)
 
@@ -29,15 +29,12 @@ class TpLinkStokLuciAuthenticationClientTest {
 
         assertTrue(client.isAuthenticated)
         assertEquals("mytoken123", session.stok)
-        assertEquals("deadbeef1234", session.sysauthCookie)
     }
 
     @Test
-    fun `login calls keys, auth and login endpoints in that order`() {
+    fun `login calls keys, auth and login endpoints in this exact order - two separate preparation calls`() {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
-            authResponse = authSuccessResponse(),
-            loginResponse = loginSuccessResponse(),
+            simulateRealServerStok = "tok",
         )
         val client = TpLinkStokLuciAuthenticationClient("192.168.0.1", transport)
 
@@ -50,11 +47,9 @@ class TpLinkStokLuciAuthenticationClientTest {
     }
 
     @Test
-    fun `login body never contains the plaintext password, only the RSA-encrypted hex`() {
+    fun `login body is a sign+data envelope, never operation=login&password=`() {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
-            authResponse = authSuccessResponse(),
-            loginResponse = loginSuccessResponse(),
+            simulateRealServerStok = "tok",
         )
         val client = TpLinkStokLuciAuthenticationClient("192.168.0.1", transport)
         val distinctivePassword = "S3nh4-Distintiva-StokLuci"
@@ -63,54 +58,61 @@ class TpLinkStokLuciAuthenticationClientTest {
 
         val sentBody = transport.lastLoginBody.orEmpty()
         assertFalse("corpo do login vazou a senha em claro", sentBody.contains(distinctivePassword))
-        assertTrue("corpo do login nao segue o formato esperado", sentBody.startsWith("operation=login&password="))
-        assertTrue(sentBody.contains("&confirm=true"))
-        assertFalse("corpo do login nao deve conter campo de usuario", sentBody.contains("username"))
+        assertTrue("corpo do login deve seguir o envelope sign/data real", sentBody.startsWith("sign="))
+        assertTrue(sentBody.contains("&data="))
+        assertFalse("corpo do login nao deve usar o formato antigo operation=login&password=", sentBody.contains("operation=login&password="))
     }
 
     @Test
-    fun `login populates authKeys from form=auth response, used only for future authenticated calls`() {
+    fun `login populates passwordKey from form=keys and authKeys from form=auth - two distinct RSA keys`() {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
-            authResponse = authSuccessResponse(),
-            loginResponse = loginSuccessResponse(),
+            authResponse = authSuccessResponse(seq = 12345),
+            simulateRealServerStok = "tok",
         )
         val client = TpLinkStokLuciAuthenticationClient("192.168.0.1", transport)
 
         client.login("admin", "secret")
 
+        assertEquals(TestRsaKeyFixture.MODULUS_HEX, client.passwordKey?.key?.modulusHex)
         assertEquals(12345L, client.authKeys?.seq)
+        assertEquals(TestSignKeyFixture.MODULUS_HEX, client.authKeys?.key?.modulusHex)
+        assertFalse(
+            "chave de senha (form=keys) e chave de assinatura (form=auth) devem ser distintas",
+            client.passwordKey?.key?.modulusHex == client.authKeys?.key?.modulusHex,
+        )
     }
 
     @Test
     fun `login fails fast when keys endpoint is unavailable`() {
-        val transport = FakeTpLinkStokLuciHttpTransport(keysResponse = null)
+        val transport = FakeTpLinkStokLuciHttpTransport(keysResponse = null, simulateRealServerStok = null)
         val client = TpLinkStokLuciAuthenticationClient("192.168.0.1", transport)
 
         val exception = assertThrows(TpLinkStokLuciLoginException::class.java) {
             client.login("admin", "secret")
         }
-        assertEquals(TpLinkStokLuciLoginFailureReason.KEYS_ENDPOINT_UNAVAILABLE, exception.reason)
+        assertEquals(TpLinkStokLuciLoginFailureReason.AUTH_ENDPOINT_UNAVAILABLE, exception.reason)
+        assertEquals(1, transport.postCallCount)
     }
 
     @Test
-    fun `login succeeds even when form=auth endpoint fails - signing key is not required for login itself`() {
+    fun `login fails fast when auth endpoint is unavailable after keys succeeds`() {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
-            authResponse = HttpTransportResponse(500, "", emptyMap(), emptyMap()),
-            loginResponse = loginSuccessResponse(),
+            keysResponse = passwordKeySuccessResponse(),
+            authResponse = null,
         )
         val client = TpLinkStokLuciAuthenticationClient("192.168.0.1", transport)
 
-        client.login("admin", "secret")
-
-        assertTrue(client.isAuthenticated)
+        val exception = assertThrows(TpLinkStokLuciLoginException::class.java) {
+            client.login("admin", "secret")
+        }
+        assertEquals(TpLinkStokLuciLoginFailureReason.AUTH_ENDPOINT_UNAVAILABLE, exception.reason)
+        assertEquals(2, transport.postCallCount)
     }
 
     @Test
-    fun `login maps response without stok or sysauth to INVALID_CREDENTIALS`() {
+    fun `login maps response without data field to INVALID_CREDENTIALS`() {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
+            keysResponse = passwordKeySuccessResponse(),
             authResponse = authSuccessResponse(),
             loginResponse = loginFailureResponse(),
         )
@@ -123,9 +125,24 @@ class TpLinkStokLuciAuthenticationClientTest {
     }
 
     @Test
+    fun `login maps HTTP 403 on the login endpoint to INVALID_CREDENTIALS - matches the real failure observed against hardware`() {
+        val transport = FakeTpLinkStokLuciHttpTransport(
+            keysResponse = passwordKeySuccessResponse(),
+            authResponse = authSuccessResponse(),
+            loginResponse = HttpTransportResponse(403, "", emptyMap(), emptyMap()),
+        )
+        val client = TpLinkStokLuciAuthenticationClient("192.168.0.1", transport)
+
+        val exception = assertThrows(TpLinkStokLuciLoginException::class.java) {
+            client.login("admin", "wrong-password")
+        }
+        assertEquals(TpLinkStokLuciLoginFailureReason.INVALID_CREDENTIALS, exception.reason)
+    }
+
+    @Test
     fun `login maps HTTP 401 on the login endpoint to INVALID_CREDENTIALS`() {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
+            keysResponse = passwordKeySuccessResponse(),
             authResponse = authSuccessResponse(),
             loginResponse = HttpTransportResponse(401, "", emptyMap(), emptyMap()),
         )
@@ -140,7 +157,7 @@ class TpLinkStokLuciAuthenticationClientTest {
     @Test
     fun `login maps unexpected HTTP status on login endpoint to UNEXPECTED_RESPONSE`() {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
+            keysResponse = passwordKeySuccessResponse(),
             authResponse = authSuccessResponse(),
             loginResponse = HttpTransportResponse(500, "", emptyMap(), emptyMap()),
         )
@@ -180,12 +197,10 @@ class TpLinkStokLuciAuthenticationClientTest {
     }
 
     @Test
-    fun `fetchAuthenticated sends the sysauth cookie and uses the stok in the path`() {
+    fun `fetchAuthenticated uses the stok in the path`() {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
             authResponse = authSuccessResponse(),
-            loginResponse = loginSuccessResponse(stok = "tok999"),
-            statusResponse = HttpTransportResponse(200, """{"ok":true}""", emptyMap(), emptyMap()),
+            simulateRealServerStok = "tok999",
         )
         val client = TpLinkStokLuciAuthenticationClient("192.168.0.1", transport)
         client.login("admin", "secret")

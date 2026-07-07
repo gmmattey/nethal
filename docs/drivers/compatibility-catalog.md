@@ -201,10 +201,12 @@ use apenas na sua própria rede confiável". Não é bloqueante para o driver co
 
 ## Limitação conhecida — TOFU no handshake stok/luci do TP-Link Archer C6
 
-O login do `TpLinkStokLuciDriverFamily` (profile `tplink_archer_c6_stok_v1`) busca a chave pública
-RSA da senha em `POST /cgi-bin/luci/;stok=/login?form=keys` do próprio host, sem certificado nem
-pinagem — mesma classe de risco *trust on first use* (TOFU) já documentada acima para o Nokia,
-inerente ao protocolo desse firmware TP-Link, não uma escolha do NetHAL.
+O login do `TpLinkStokLuciDriverFamily` (profile `tplink_archer_c6_stok_v1`) busca duas chaves
+públicas RSA distintas do próprio host, sem certificado nem pinagem — `POST
+/cgi-bin/luci/;stok=/login?form=keys` (chave de cifra de senha, 1024-bit) e `POST
+/cgi-bin/luci/;stok=/login?form=auth` (chave de assinatura do envelope `sign`, 512-bit, + `seq`) —
+mesma classe de risco *trust on first use* (TOFU) já documentada acima para o Nokia, inerente ao
+protocolo desse firmware TP-Link, não uma escolha do NetHAL.
 
 Mitigação já implementada: `TpLinkStokLuciDriverFamily` recusa construir contra qualquer host que
 não seja IP privado (RFC 1918) — mesma guarda `PrivateIpRanges` usada por todos os drivers. Isso
@@ -324,6 +326,71 @@ Revisão de segurança: Marisa, 2026-07-07 (passo 4 do plano de refatoração HA
 C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
 
 ## Changelog
+
+- **2026-07-07 (terceira rodada, evidência DEFINITIVA via Playwright — reposição de `form=keys`,
+  manifesto `catalog-2026.07.18.json`)** — A segunda rodada de correção (manifesto
+  `catalog-2026.07.17.json`) tinha concluído, por engano, que o handshake do
+  `TpLinkStokLuciAuthenticationClient` usa uma única chamada de preparação (`form=auth`) com uma
+  única chave RSA reaproveitada para cifrar a senha e assinar o envelope `sign`. Essa conclusão foi
+  baseada em captura **incompleta** feita com a extensão Chrome, que pulou a chamada `form=keys` por
+  algum motivo de cache/estado do navegador naquela tentativa específica — não porque o protocolo
+  real só tem uma chamada. Nesta rodada usamos **Playwright** (não mais a extensão Chrome) para
+  abrir um navegador real, interceptar `page.on('response')` e capturar o corpo **completo** de
+  request E response de cada chamada `cgi-bin/luci` durante um login real que teve sucesso total —
+  inclusive chamadas autenticadas pós-login, com `stok` real funcionando. Essa captura completa
+  **confirma que existem sim duas chamadas de preparação com duas chaves RSA distintas**, exatamente
+  como a lib de referência `tplinkrouterc6u` sempre documentou: `form=keys` (`operation=read`)
+  devolve `{"success":true,"data":{"password":[<256 hex>,"010001"],"mode":"router","username":""}}`
+  — chave RSA 1024-bit usada só para cifrar a senha; `form=auth` (`operation=read`) devolve
+  `{"success":true,"data":{"key":[<128 hex>,"010001"],"seq":<número>}}` — chave RSA 512-bit
+  **diferente** da anterior, usada só para assinar o envelope `sign`. O tamanho de bloco do RSA em
+  pedaços do `sign` (53 bytes) foi confirmado como corretamente derivado do tamanho real da chave de
+  assinatura (512-bit = 64 bytes, menos 11 bytes de overhead PKCS1v1.5) — não é mais um valor
+  arbitrário. A remoção do `&confirm=true` do corpo de login (correção da rodada anterior) permanece
+  confirmada correta pela captura completa desta rodada. `TpLinkStokLuciAuthenticationClient`,
+  `TpLinkStokLuciResponseParser` e `TpLinkStokLuciModels` foram corrigidos para repor a chamada a
+  `form=keys` e usar as duas chaves distintas corretamente. `stage` permanece `DISCOVERY_ONLY` até o
+  próximo teste real (`gradlew :core:tplinkC6StokManualCheck`) confirmar login bem-sucedido com esta
+  implementação corrigida.
+
+- **2026-07-07 (correção do corpo de login `tplink-stok-luci` — `&confirm=true` removido, senha
+  cifrada em RSA confirmada byte a byte, manifesto `catalog-2026.07.17.json`)** — Segunda rodada de
+  correção do `TpLinkStokLuciDriverFamily`. A correção anterior (envelope `sign`/`data`, uma única
+  chamada a `form=auth`) ainda falhava com `INVALID_CREDENTIALS`/HTTP 403 contra o hardware físico
+  do Luiz. Causa raiz encontrada por evidência ao vivo mais precisa: hook real instalado em
+  `CryptoJS.AES.encrypt` na própria página do equipamento (não mais interceptação de
+  `XMLHttpRequest`), capturando o texto plano exato que entra no AES durante um login real
+  bem-sucedido pelo navegador. O texto plano é exatamente `operation=login&password=<256 caracteres
+  hex>` — **sem** `&confirm=true` (tamanho total capturado, 281 caracteres, bate exatamente com
+  `"operation=login&password="` de 25 caracteres + 256 caracteres hex). Os 256 caracteres hex do
+  campo `password` são a senha **já cifrada em RSA** (saída de RSA de 1024 bits com a mesma chave de
+  `form=auth`), não a senha em texto puro como a implementação anterior assumia por analogia com a
+  lib de referência `tplinkrouterc6u`.
+
+  `TpLinkStokLuciCrypto.buildLoginPlaintext` mudou de assinatura: recebe agora
+  `rsaEncryptedPasswordHex` (a senha já cifrada em RSA, em hex), não mais a senha em texto puro, e
+  monta só `operation=login&password=<rsaEncryptedPasswordHex>`, sem `confirm=true`.
+  `TpLinkStokLuciAuthenticationClient.login` cifra a senha em RSA (mesma chave devolvida por
+  `form=auth`, PKCS1v1.5) antes de montar o texto plano do login. A mesma captura ao vivo confirmou
+  `keyWords: 4` no hook (CryptoJS usa palavras de 32 bits; 4 palavras = 16 bytes = 128 bits) →
+  **AES-128**, nunca AES-256 — a implementação já usava `AES_KEY_SIZE_BYTES = 16`, então nenhuma
+  mudança de código foi necessária aí, só a confirmação em KDoc.
+
+  Testes atualizados: `TpLinkStokLuciCryptoTest` (`buildLoginPlaintext` agora testa o corpo com a
+  senha já em RSA-hex, sem `confirm=true`). `TpLinkStokLuciAuthenticationClientTest` e
+  `FakeTpLinkStokLuciHttpTransport` não precisaram de mudança — o fake decifra o envelope `sign`
+  para extrair a chave/IV AES e nunca inspecionava o texto plano de `data` diretamente.
+
+  Novo manifesto `catalog-2026.07.17.json` (`previousManifest: catalog-2026.07.16.json`): só o
+  profile `tplink_archer_c6_stok_v1` foi alterado — a entrada de evidência anterior sobre a
+  estrutura do texto plano de `data` (baseada só na lib `tplinkrouterc6u`, MEDIUM) foi rebaixada para
+  LOW e marcada como parcialmente refutada; nova entrada `auth_mechanism` (HIGH) documenta o achado
+  confirmado byte a byte; `stageReason`/`physicalTestAccessNote`/`knownFirmwareBugs[]` atualizados.
+  `confidenceScoreOverall` permanece `0.4` — ainda não há execução real de login bem-sucedida com a
+  implementação corrigida, só a correção da causa raiz do 403 anterior. `stage` permanece
+  `DISCOVERY_ONLY` até o próximo teste real (`gradlew :core:tplinkC6StokManualCheck`) confirmar
+  sucesso — não promover sem esse teste (`/ciclo-vida-driver`). `loadEmbeddedCatalogResource()`
+  (default de `DriverRegistry.kt`) atualizado para apontar para o novo manifesto.
 
 - **2026-07-07 (implementação de `TpLinkStokLuciDriverFamily` — protocolo entendido por pesquisa
   de terceiros, NUNCA testado contra hardware real)** — Implementa o login (passos 1-5 do

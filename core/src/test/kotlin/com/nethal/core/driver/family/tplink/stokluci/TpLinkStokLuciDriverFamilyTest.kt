@@ -40,9 +40,7 @@ class TpLinkStokLuciDriverFamilyTest {
     @Test
     fun `login succeeds on first attempt against a well-formed fake response`() = runTest {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
-            authResponse = authSuccessResponse(),
-            loginResponse = loginSuccessResponse(stok = "tokABC"),
+            simulateRealServerStok = "tokABC",
         )
         val driver = TpLinkStokLuciDriverFamily("192.168.0.1", realProfileConfig(), transport, backoffMillis = { 0L })
 
@@ -55,7 +53,7 @@ class TpLinkStokLuciDriverFamilyTest {
     @Test
     fun `login fails fast on invalid credentials without exhausting retries`() = runTest {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
+            keysResponse = passwordKeySuccessResponse(),
             authResponse = authSuccessResponse(),
             loginResponse = loginFailureResponse(),
         )
@@ -89,9 +87,7 @@ class TpLinkStokLuciDriverFamilyTest {
     @Test
     fun `readStatusRaw returns the raw body after a successful login`() = runTest {
         val transport = FakeTpLinkStokLuciHttpTransport(
-            keysResponse = keysSuccessResponse(),
-            authResponse = authSuccessResponse(),
-            loginResponse = loginSuccessResponse(stok = "tokXYZ"),
+            simulateRealServerStok = "tokXYZ",
             statusResponse = com.nethal.core.protocol.http.HttpTransportResponse(200, """{"status":"ok"}""", emptyMap(), emptyMap()),
         )
         val driver = TpLinkStokLuciDriverFamily("192.168.0.1", realProfileConfig(), transport, backoffMillis = { 0L })

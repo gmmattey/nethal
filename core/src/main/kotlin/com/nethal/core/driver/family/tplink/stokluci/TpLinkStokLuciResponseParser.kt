@@ -5,68 +5,81 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Codec do protocolo JSON real (não texto plano, diferente do `tplink-legacy-cgi`) da plataforma
- * `tplink-stok-luci`. Entendimento do formato vem de pesquisa em código aberto de terceiros
- * (pacote `tplinkrouterc6u`, GPL-3.0) — ver KDoc de [TpLinkStokLuciCrypto] para a citação completa
- * e a ressalva de que isto é reimplementação original, nunca cópia literal.
+ * Codec do protocolo JSON real da plataforma `tplink-stok-luci`, corrigido a partir de evidência ao
+ * vivo **definitiva** (terceira rodada, 2026-07-07): captura via Playwright, com
+ * `page.on('response')` interceptando corpo completo de request E response de cada chamada
+ * `cgi-bin/luci` durante um login real bem-sucedido contra o hardware físico do Luiz (Archer C6
+ * v2.0, firmware `1.1.10 Build 20230830 rel.69433(5553)`) — inclusive chamadas autenticadas
+ * pós-login, com `stok` real funcionando. Ver KDoc de [TpLinkStokLuciCrypto] para o detalhe
+ * completo da correção e o que ainda não está confirmado byte a byte.
  *
- * Formato de resposta de `form=keys` (`operation=read`):
+ * Formato real de resposta de `form=keys` (`operation=read`, primeira chamada de preparação —
+ * chave RSA **só para cifrar a senha**):
  * ```json
- * {"data": {"password": ["<modulus_hex>", "<exponent_hex>"]}}
+ * {"success":true,"data":{"password":["<256 caracteres hex, RSA 1024-bit>","010001"],"mode":"router","username":""}}
  * ```
  *
- * Formato de resposta de `form=auth` (`operation=read`):
+ * Formato real de resposta de `form=auth` (`operation=read`, segunda chamada de preparação — chave
+ * RSA **só para assinar o envelope `sign`**, distinta da de `form=keys`):
  * ```json
- * {"data": {"seq": 123, "key": ["<modulus_hex>", "<exponent_hex>"]}}
+ * {"success":true,"data":{"key":["<128 caracteres hex, RSA 512-bit>","010001"],"seq":123}}
  * ```
  *
- * Formato de resposta de `form=login` bem-sucedido:
+ * Formato real de resposta de `form=login` bem-sucedido:
  * ```json
- * {"data": {"stok": "<token>"}}
+ * {"data": "<base64, ciphertext AES-CBC cifrado com a chave/IV da sessão de login>"}
  * ```
- * (o `stok` de sucesso vem acompanhado de header `Set-Cookie` contendo `sysauth=<valor>;`, extraído
- * separadamente por [TpLinkStokLuciCrypto.extractSysauthCookie] — não faz parte deste payload
- * JSON.)
+ * (sem campo `success` visível no corpo, diferente das respostas de `form=keys`/`form=auth` — o
+ * corpo decifrado contém um JSON com `stok`, mesmo padrão de `loads(aes_decrypt(data['data']))` da
+ * lib de referência; estrutura exata do JSON decifrado não confirmada byte a byte além do campo
+ * `stok` em si.)
+ *
+ * **Correção sobre a rodada anterior** (manifesto `catalog-2026.07.17.json`): aquela rodada
+ * concluiu, por engano, que só existia a chamada `form=auth` e uma única chave RSA reaproveitada
+ * para senha e assinatura. Essa conclusão veio de uma captura incompleta (extensão Chrome pulou
+ * `form=keys` por cache/estado do navegador). A captura completa via Playwright desta rodada
+ * confirma as duas chamadas com duas chaves distintas.
  */
 internal object TpLinkStokLuciResponseParser {
 
     private val json = Json { ignoreUnknownKeys = true }
 
     @Serializable
-    private data class KeysResponseData(val password: List<String> = emptyList())
+    private data class PasswordKeyResponseData(val password: List<String> = emptyList())
 
     @Serializable
-    private data class KeysResponse(val data: KeysResponseData? = null)
+    private data class PasswordKeyResponse(val success: Boolean = false, val data: PasswordKeyResponseData? = null)
 
     @Serializable
     private data class AuthResponseData(val seq: Long = 0L, val key: List<String> = emptyList())
 
     @Serializable
-    private data class AuthResponse(val data: AuthResponseData? = null)
+    private data class AuthResponse(val success: Boolean = false, val data: AuthResponseData? = null)
 
     @Serializable
-    private data class LoginResponseData(val stok: String? = null)
+    private data class LoginResponseEnvelope(val data: String? = null)
 
     @Serializable
-    private data class LoginResponse(val data: LoginResponseData? = null)
+    private data class DecryptedLoginPayload(val stok: String? = null)
 
     /**
-     * Extrai a chave RSA de cifra de senha da resposta de `form=keys`. Retorna `null` se a
-     * resposta não tiver o formato esperado (JSON malformado, `data`/`password` ausente, ou lista
-     * com menos de 2 elementos) — nunca lança, tratamento defensivo igual ao parser do
-     * `tplink-legacy-cgi`.
+     * Extrai a chave RSA de cifra de senha (1024-bit) da resposta real de `form=keys`
+     * (`data.password = [modulus_hex, exponent_hex]`). Retorna `null` se a resposta não tiver o
+     * formato esperado — nunca lança, tratamento defensivo consistente com o resto do NetHAL.
      */
-    fun parsePasswordEncryptionKey(body: String): TpLinkStokLuciRsaKey? {
-        val parsed = runCatching { json.decodeFromString(KeysResponse.serializer(), body) }.getOrNull()
-        val password = parsed?.data?.password ?: return null
-        if (password.size < 2) return null
-        return TpLinkStokLuciRsaKey(modulusHex = password[0], exponentHex = password[1])
+    fun parsePasswordKey(body: String): TpLinkStokLuciPasswordKey? {
+        val parsed = runCatching { json.decodeFromString(PasswordKeyResponse.serializer(), body) }.getOrNull()
+        val data = parsed?.data ?: return null
+        if (data.password.size < 2) return null
+        return TpLinkStokLuciPasswordKey(
+            key = TpLinkStokLuciRsaKey(modulusHex = data.password[0], exponentHex = data.password[1]),
+        )
     }
 
     /**
-     * Extrai a sequência + chave RSA de assinatura da resposta de `form=auth`. Usada só para
-     * preparar a etapa 6 (chamadas autenticadas, fora de escopo desta entrega) — não consumida
-     * pelo fluxo de login em si.
+     * Extrai a chave RSA de assinatura (512-bit) + sequência da resposta real de `form=auth`
+     * (`data.key = [modulus_hex, exponent_hex]`, `data.seq`). Retorna `null` se a resposta não tiver
+     * o formato esperado — nunca lança, tratamento defensivo consistente com o resto do NetHAL.
      */
     fun parseAuthKeys(body: String): TpLinkStokLuciAuthKeys? {
         val parsed = runCatching { json.decodeFromString(AuthResponse.serializer(), body) }.getOrNull()
@@ -74,14 +87,20 @@ internal object TpLinkStokLuciResponseParser {
         if (data.key.size < 2) return null
         return TpLinkStokLuciAuthKeys(
             seq = data.seq,
-            signingKey = TpLinkStokLuciRsaKey(modulusHex = data.key[0], exponentHex = data.key[1]),
+            key = TpLinkStokLuciRsaKey(modulusHex = data.key[0], exponentHex = data.key[1]),
         )
     }
 
-    /** Extrai o `stok` da resposta de `form=login` bem-sucedido. `null` se ausente/malformado. */
-    fun parseLoginStok(body: String): String? {
-        val parsed = runCatching { json.decodeFromString(LoginResponse.serializer(), body) }.getOrNull()
-        return parsed?.data?.stok?.takeIf { it.isNotBlank() }
+    /** Extrai o campo `data` (base64, ciphertext) do envelope de resposta de `form=login`. `null` se ausente/malformado. */
+    fun parseLoginCiphertextBase64(body: String): String? {
+        val parsed = runCatching { json.decodeFromString(LoginResponseEnvelope.serializer(), body) }.getOrNull()
+        return parsed?.data?.takeIf { it.isNotBlank() }
+    }
+
+    /** Extrai o `stok` do JSON decifrado (texto plano) do payload de login bem-sucedido. `null` se ausente/malformado. */
+    fun parseDecryptedStok(decryptedJson: String): String? {
+        val parsed = runCatching { json.decodeFromString(DecryptedLoginPayload.serializer(), decryptedJson) }.getOrNull()
+        return parsed?.stok?.takeIf { it.isNotBlank() }
     }
 }
 
