@@ -36,11 +36,13 @@ internal class TplinkC20LoginException(
  * - Como não há um endpoint de login separado, "autenticar" aqui significa **validar a credencial
  *   fazendo uma primeira leitura real**, replicando EXATAMENTE o único bundle de blocos com prova
  *   real de sucesso (`IGD_DEV_INFO+ETH_SWITCH+SYS_MODE+/cgi/info`, a carga da tela de Status
- *   inicial) e checando HTTP 200 + `[error]0` + `modelName=` no corpo. Uma tentativa anterior desta
- *   classe usava um bundle simplificado (só `IGD_DEV_INFO`, sem os outros três blocos) — combinação
- *   nunca provada, e que o teste real contra o hardware do Luiz em 2026-07-06 mostrou falhar com
- *   `[error]71111` (não é erro de credencial: a senha estava correta). Corrigido para replicar o
- *   bundle literal comprovado, sem simplificar ou extrapolar.
+ *   inicial) e checando HTTP 200 + `[error]0` + `modelName=` no corpo.
+ * - Duas rodadas de teste real (2026-07-06/07) contra o hardware do Luiz retornaram `[error]71111`
+ *   com senha correta, mesmo depois de corrigir o bundle de seções acima. Causa raiz real, achada
+ *   comparando um segundo HAR completo (login real, 130 requisições `/cgi`) byte a byte com o que
+ *   este driver enviava: [TplinkC20ResponseParser.buildRequestBody] usava `\n` como terminador de
+ *   linha, mas as 130 requisições reais usam `\r\n` (CRLF) sem exceção — o parser de linha do
+ *   firmware provavelmente exige CRLF. Corrigido lá, não aqui.
  * - Essa é uma decisão de design deste driver, não algo capturado literalmente: a captura real não
  *   inclui um caso de credencial inválida (não observamos o que o roteador devolve nesse caso), então
  *   assumimos o padrão HTTP Basic (401 para credencial inválida) e tratamos qualquer corpo sem
