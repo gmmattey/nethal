@@ -45,6 +45,20 @@ class TplinkC20ResponseParserTest {
     }
 
     @Test
+    fun `buildRequestBody terminates every line with CRLF, never bare LF - confirmado por HAR real`() {
+        val body = TplinkC20ResponseParser.buildRequestBody(
+            listOf("IGD_DEV_INFO" to listOf("modelName", "description")),
+        )
+
+        assertTrue("corpo deve conter CRLF", body.contains("\r\n"))
+        assertEquals(
+            "nao deve haver LF sem CR precedente (todo \\n deve vir depois de \\r)",
+            0,
+            body.replace("\r\n", "").count { it == '\n' },
+        )
+    }
+
+    @Test
     fun `extractGlobalErrorCode reads error code zero as success marker`() {
         assertEquals(0, TplinkC20ResponseParser.extractGlobalErrorCode("[1,1,0,0,0,0]0\nmodelName=Archer C20\n[error]0"))
         assertTrue(TplinkC20ResponseParser.isSuccess("[error]0"))

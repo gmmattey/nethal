@@ -5,7 +5,8 @@ package com.nethal.core.driver.tplink
  * confirmado por captura via DevTools contra unidade física do Luiz (2026-07-06, ver SIG-337/
  * SIG-338). Substitui o parser especulativo anterior (JSON por endpoint, REFUTED por HTTP 500).
  *
- * Formato de request (corpo `text/plain`, um ou mais blocos):
+ * Formato de request (corpo `text/plain`, um ou mais blocos, linhas terminadas em `\r\n`/CRLF —
+ * confirmado por dois HARs reais, nunca LF puro):
  * ```
  * [NOME_SECAO#0,0,0,0,0,0#0,0,0,0,0,0]indice,qtdCampos
  * campo1
@@ -50,12 +51,17 @@ internal object TplinkC20ResponseParser {
      * nenhum bloco automaticamente — se o chamador quiser o bloco de sessão `/cgi/info`, deve
      * incluí-lo explicitamente na lista (`"/cgi/info" to emptyList()`), replicando exatamente a
      * combinação comprovada por captura real, não uma combinação nova inventada.
+     *
+     * Terminador de linha é `\r\n` (CRLF), não `\n` — confirmado por um segundo HAR real (2026-07-07,
+     * 130 requisições `/cgi` de uma sessão completa de login-ao-logout), todas com CRLF, nenhuma com
+     * LF puro. Uma versão anterior desta função usava `\n`, o que causava `[error]71111` no primeiro
+     * teste real do Luiz contra o hardware — o parser de linha do firmware provavelmente exige CRLF.
      */
     fun buildRequestBody(sections: List<Pair<String, List<String>>>): String {
         val builder = StringBuilder()
         sections.forEachIndexed { index, (sectionName, fields) ->
-            builder.append("[$sectionName#0,0,0,0,0,0#0,0,0,0,0,0]$index,${fields.size}\n")
-            fields.forEach { field -> builder.append("$field\n") }
+            builder.append("[$sectionName#0,0,0,0,0,0#0,0,0,0,0,0]$index,${fields.size}\r\n")
+            fields.forEach { field -> builder.append("$field\r\n") }
         }
         return builder.toString()
     }
