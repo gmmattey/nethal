@@ -1,3 +1,5 @@
+import org.gradle.process.CommandLineArgumentProvider
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
@@ -14,35 +16,36 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
 }
 
-// Diagnostico manual do driver Nokia contra hardware real (SIG-333) - nunca roda em CI/test,
-// so quando o usuario dispara explicitamente. Ver ManualCheckRunner.kt para o porque de a
-// senha ser sempre interativa, nunca argumento de linha de comando.
+// Diagnostico manual - passo 7 do plano de refatoracao HAL (hal-layering-model.md SS10): as tres
+// tasks abaixo agora compartilham o mesmo runner (core/tooling/ManualCheckRunner.kt), que decide o
+// caminho certo (Driver Family via registry, hoje so para o C20, ou instanciacao direta para
+// C6/Nokia) a partir do profileId fixado por cada task via argumentProviders. Nomes de task e
+// forma de uso (--args="<ip> <usuario> [cbc|gcm]") preservados de proposito, para nao quebrar o
+// habito de quem ja roda `gradlew :core:tplinkC20ManualCheck` etc. - o profileId e injetado antes
+// dos argumentos passados pelo usuario, nunca precisa ser digitado por ele.
 tasks.register<JavaExec>("nokiaManualCheck") {
     group = "verification"
     description = "Diagnostico manual contra um Nokia G-1425G-B real na LAN (SIG-333). Uso: gradlew :core:nokiaManualCheck --args=\"<ip> <usuario>\""
     classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.nethal.core.driver.nokia.ManualCheckRunnerKt")
+    mainClass.set("com.nethal.core.tooling.ManualCheckRunnerKt")
+    argumentProviders.add(CommandLineArgumentProvider { listOf("nokia_g1425gb_v1") })
     standardInput = System.`in`
 }
 
-// Diagnostico manual do driver TP-Link contra hardware real - nunca roda em CI/test, so quando o
-// usuario dispara explicitamente. Ver ManualCheckRunner.kt (pacote tplink) para o porque de a
-// senha ser sempre interativa, nunca argumento de linha de comando.
 tasks.register<JavaExec>("tplinkManualCheck") {
     group = "verification"
     description = "Diagnostico manual contra um TP-Link Archer C6 real na LAN. Uso: gradlew :core:tplinkManualCheck --args=\"<ip> <usuario> [cbc|gcm]\""
     classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.nethal.core.driver.tplink.ManualCheckRunnerKt")
+    mainClass.set("com.nethal.core.tooling.ManualCheckRunnerKt")
+    argumentProviders.add(CommandLineArgumentProvider { listOf("tplink_archer_c6_v1") })
     standardInput = System.`in`
 }
 
-// Diagnostico manual do driver TP-Link Archer C20 contra hardware real - nunca roda em CI/test,
-// so quando o usuario dispara explicitamente. Mecanismo de login e especulativo para este modelo
-// (ver TplinkC20AuthenticationClient) - falha aqui e esperada e informativa.
 tasks.register<JavaExec>("tplinkC20ManualCheck") {
     group = "verification"
     description = "Diagnostico manual contra um TP-Link Archer C20 real na LAN. Uso: gradlew :core:tplinkC20ManualCheck --args=\"<ip> <usuario>\""
     classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.nethal.core.driver.tplink.ManualCheckRunnerC20Kt")
+    mainClass.set("com.nethal.core.tooling.ManualCheckRunnerKt")
+    argumentProviders.add(CommandLineArgumentProvider { listOf("tplink_archer_c20_v1") })
     standardInput = System.`in`
 }
