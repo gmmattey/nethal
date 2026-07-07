@@ -25,7 +25,7 @@ internal class FakeTplinkHttpTransport(
         return TplinkHttpResponse(404, "", emptyMap(), emptyMap())
     }
 
-    override fun post(url: String, body: String, initCookies: Map<String, String>): TplinkHttpResponse {
+    override fun post(url: String, body: String, cookies: Map<String, String>): TplinkHttpResponse {
         postCallCount++
         if (url.endsWith("/cgi/getParm")) return getParmResponse
         check(loginResponses.isNotEmpty()) { "FakeTplinkHttpTransport: nenhuma resposta de login configurada para esta chamada" }

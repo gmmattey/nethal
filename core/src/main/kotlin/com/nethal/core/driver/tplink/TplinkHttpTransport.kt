@@ -24,7 +24,7 @@ internal interface TplinkHttpTransport {
     fun get(url: String, extraHeaders: Map<String, String> = emptyMap()): TplinkHttpResponse
 
     @Throws(IOException::class)
-    fun post(url: String, body: String, initCookies: Map<String, String> = emptyMap()): TplinkHttpResponse
+    fun post(url: String, body: String, cookies: Map<String, String> = emptyMap()): TplinkHttpResponse
 }
 
 /**
@@ -50,7 +50,7 @@ internal class DefaultTplinkHttpTransport(
         return readResponse(connection)
     }
 
-    override fun post(url: String, body: String, initCookies: Map<String, String>): TplinkHttpResponse {
+    override fun post(url: String, body: String, cookies: Map<String, String>): TplinkHttpResponse {
         val bodyBytes = body.toByteArray(Charsets.UTF_8)
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -65,8 +65,8 @@ internal class DefaultTplinkHttpTransport(
                 val base = URL(url)
                 "${base.protocol}://${base.host}${if (base.port !in listOf(-1, 80, 443)) ":${base.port}" else ""}/"
             })
-            if (initCookies.isNotEmpty()) {
-                setRequestProperty("Cookie", initCookies.entries.joinToString("; ") { "${it.key}=${it.value}" })
+            if (cookies.isNotEmpty()) {
+                setRequestProperty("Cookie", cookies.entries.joinToString("; ") { "${it.key}=${it.value}" })
             }
             setFixedLengthStreamingMode(bodyBytes.size)
             outputStream.write(bodyBytes)

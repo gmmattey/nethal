@@ -8,6 +8,11 @@ import kotlinx.coroutines.runBlocking
  * `./gradlew :core:tplinkC20ManualCheck`, disparado manualmente pelo próprio usuário no terminal
  * dele.
  *
+ * Protocolo real confirmado por captura via DevTools contra unidade física do Luiz (2026-07-06,
+ * ver SIG-337/SIG-338) — não há mais um passo de "login" separado: a primeira leitura
+ * (IGD_DEV_INFO) já valida a credencial via cookie `Authorization: Basic <base64>`. Ver
+ * `TplinkC20AuthenticationClient`.
+ *
  * A senha nunca deve ser passada como argumento de linha de comando nem digitada numa sessão do
  * Claude Code — sempre via prompt interativo, num terminal próprio, fora de qualquer transcript de
  * conversa.
@@ -16,7 +21,6 @@ fun main(args: Array<String>) {
     if (args.size < 2) {
         println("Uso: gradlew :core:tplinkC20ManualCheck --args=\"<ip> <usuario>\"")
         println("A senha é pedida depois, de forma interativa — nunca via argumento.")
-        println("Mecanismo de login é especulativo para este modelo (ver TplinkC20AuthenticationClient) — falha aqui é esperada e informativa, não um bug do driver.")
         return
     }
 
@@ -56,16 +60,16 @@ fun main(args: Array<String>) {
             println("--- Device Info ---")
             println(snapshot.deviceInfo?.toString() ?: "(não disponível / falha ao interpretar resposta)")
             println("--- WAN ---")
-            println(snapshot.wan?.toString() ?: "(não disponível / falha ao interpretar resposta)")
+            println("(READ_WAN_STATUS ainda é UNKNOWN — seção real não capturada, não implementada)")
             println("--- Wi-Fi ---")
             if (snapshot.wifi.isEmpty()) println("(nenhuma banda interpretada)") else snapshot.wifi.forEach(::println)
             println("--- Clientes conectados ---")
             if (snapshot.connectedClients.isEmpty()) println("(nenhum cliente interpretado)") else snapshot.connectedClients.forEach(::println)
-            println("(copie estes valores, e quaisquer diferenças de endpoint/campo observadas, para o catálogo de compatibilidade — profile tplink_archer_c20_v1)")
+            println("(copie estes valores, e quaisquer diferenças de seção/campo observadas, para o catálogo de compatibilidade — profile tplink_archer_c20_v1)")
         }
         is TplinkC20DriverResult.Failure -> {
             println("Falha: ${result.reason} — ${result.message}")
-            println("Mecanismo de auth deste driver é especulativo (MD5 simples de senha + POST /cgi/login). Se a falha for de login, capture com uma ferramenta de rede (DevTools do navegador contra a WebUI real) o endpoint e o formato real usados pelo firmware e reporte para corrigir o catálogo/driver — não tente contornar autenticação manualmente.")
+            println("Se a falha for de credencial/resposta inesperada, capture com uma ferramenta de rede (DevTools do navegador contra a WebUI real) o corpo de resposta e reporte para corrigir o catálogo/driver — não tente contornar autenticação manualmente.")
         }
     }
 }

@@ -5,12 +5,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Base64
 
 class TplinkC20OntDriverTest {
 
+    private fun basicCookie(user: String, pass: String): String =
+        "Basic " + Base64.getEncoder().encodeToString("$user:$pass".toByteArray(Charsets.UTF_8))
+
     @Test
     fun `rejects public host at construction - never sends credentials outside the LAN`() {
-        val transport = FakeTplinkC20HttpTransport(loginResponses = mutableListOf())
+        val transport = FakeTplinkC20HttpTransport()
 
         val exception = assertThrows(IllegalArgumentException::class.java) {
             TplinkC20OntDriver("8.8.8.8", transport)
@@ -20,7 +24,7 @@ class TplinkC20OntDriverTest {
 
     @Test
     fun `rejects other well-known public hosts too - not a single hardcoded exception`() {
-        val transport = FakeTplinkC20HttpTransport(loginResponses = mutableListOf())
+        val transport = FakeTplinkC20HttpTransport()
 
         listOf("1.1.1.1", "203.0.113.10", "142.250.0.1").forEach { publicHost ->
             assertThrows(IllegalArgumentException::class.java) {
@@ -31,25 +35,43 @@ class TplinkC20OntDriverTest {
 
     @Test
     fun `accepts RFC1918 private host at construction`() {
-        val transport = FakeTplinkC20HttpTransport(loginResponses = mutableListOf())
+        val transport = FakeTplinkC20HttpTransport()
 
         listOf("192.168.0.1", "10.0.0.1", "172.16.5.5").forEach { privateHost ->
             TplinkC20OntDriver(privateHost, transport) // não deve lançar
         }
     }
 
-    private val samplePages = mapOf(
-        "/cgi/getDeviceInfo" to """{"model":"Archer C20","hardwareVersion":"V4","firmwareVersion":"0.9.1","uptime":1800}""",
-        "/cgi/getWanStatus" to """{"connectionType":"PPPoE","externalIp":"203.0.113.20","gateway":"203.0.113.1","primaryDns":"8.8.8.8","secondaryDns":"8.8.4.4","connectionStatus":"Connected"}""",
-        "/cgi/getWifiStatus" to """[{"band":"2.4GHz","enabled":"true","ssid":"MinhaRedeC20","channel":"6"}]""",
-        "/cgi/getConnectedClients" to """[{"hostname":"celular","ip":"192.168.0.20","mac":"AA:BB:CC:44:55:66","type":"wifi"}]""",
-    )
+    private fun responsesForSuccessfulSnapshot(): Map<String, TplinkHttpResponse> {
+        val deviceInfoRequestBody = TplinkC20ResponseParser.buildRequestBody(
+            listOf(
+                "IGD_DEV_INFO" to listOf("modelName", "description", "X_TP_isFD"),
+                "ETH_SWITCH" to listOf("numberOfVirtualPorts"),
+                "SYS_MODE" to listOf("mode"),
+            ),
+        )
+        val wifiRequestBody = TplinkC20ResponseParser.buildRequestBody(listOf("LAN_WLAN" to listOf("name", "SSID")))
+        val clientsRequestBody = TplinkC20ResponseParser.buildRequestBody(
+            listOf("LAN_HOST_ENTRY" to listOf("leaseTimeRemaining", "MACAddress", "hostName", "IPAddress")),
+        )
+        // login() faz uma leitura só de IGD_DEV_INFO antes do snapshot completo
+        val loginOnlyRequestBody = TplinkC20ResponseParser.buildRequestBody(
+            listOf("IGD_DEV_INFO" to listOf("modelName", "description", "X_TP_isFD")),
+        )
+
+        return mapOf(
+            loginOnlyRequestBody to deviceInfoOnlyResponse(),
+            deviceInfoRequestBody to deviceInfoBundleResponse(),
+            wifiRequestBody to lanWlanResponse(),
+            clientsRequestBody to lanHostEntryResponse(),
+        )
+    }
 
     @Test
-    fun `readSnapshot succeeds on first attempt and parses all endpoints`() = runTest {
+    fun `readSnapshot succeeds on first attempt and parses all confirmed sections`() = runTest {
         val transport = FakeTplinkC20HttpTransport(
-            loginResponses = mutableListOf(successfulTplinkC20LoginResponse()),
-            authenticatedPages = samplePages,
+            expectedAuthorizationCookie = basicCookie("admin", "secret"),
+            responsesByRequestBody = responsesForSuccessfulSnapshot(),
         )
         val driver = TplinkC20OntDriver("192.168.0.1", transport, backoffMillis = { 0L })
 
@@ -57,9 +79,11 @@ class TplinkC20OntDriverTest {
 
         assertTrue(result is TplinkC20DriverResult.Success)
         val snapshot = (result as TplinkC20DriverResult.Success).snapshot
-        assertEquals("Archer C20", snapshot.deviceInfo?.model)
-        assertEquals("203.0.113.20", snapshot.wan?.externalIp)
-        assertEquals(1, snapshot.wifi.size)
+        assertEquals("Archer C20", snapshot.deviceInfo?.modelName)
+        assertEquals(4, snapshot.deviceInfo?.numberOfVirtualPorts)
+        assertEquals("ETH", snapshot.deviceInfo?.mode)
+        assertEquals(2, snapshot.wifi.size)
+        assertEquals("Casa-2.4G", snapshot.wifi[0].ssid)
         assertEquals(1, snapshot.connectedClients.size)
         assertEquals("AA:BB:CC:**:**:**", snapshot.connectedClients.first().macAddressMasked)
     }
@@ -67,8 +91,8 @@ class TplinkC20OntDriverTest {
     @Test
     fun `readSnapshot fails fast on invalid credentials without exhausting retries`() = runTest {
         val transport = FakeTplinkC20HttpTransport(
-            loginResponses = mutableListOf(invalidCredentialsTplinkC20Response()),
-            authenticatedPages = samplePages,
+            expectedAuthorizationCookie = basicCookie("admin", "correct-password"),
+            responsesByRequestBody = responsesForSuccessfulSnapshot(),
         )
         val driver = TplinkC20OntDriver("192.168.0.1", transport, maxAttempts = 2, backoffMillis = { 0L })
 
@@ -76,17 +100,13 @@ class TplinkC20OntDriverTest {
 
         assertTrue(result is TplinkC20DriverResult.Failure)
         assertEquals(TplinkC20DriverFailureReason.INVALID_CREDENTIALS, (result as TplinkC20DriverResult.Failure).reason)
-        assertEquals(1, transport.postCallCount) // sem RSA handshake: só 1 POST de login, sem repetir por retry
+        assertEquals(1, transport.postCallCount) // sem retry para credencial invalida, so 1 chamada
     }
 
     @Test
     fun `readSnapshot respects conservative max attempts default of two`() = runTest {
         val transport = FakeTplinkC20HttpTransport(
-            loginResponses = mutableListOf(
-                TplinkHttpResponse(500, "", emptyMap(), emptyMap()),
-                TplinkHttpResponse(500, "", emptyMap(), emptyMap()),
-            ),
-            authenticatedPages = samplePages,
+            defaultResponse = TplinkHttpResponse(500, "", emptyMap(), emptyMap()),
         )
         var backoffCalls = 0
         val driver = TplinkC20OntDriver("192.168.0.1", transport, backoffMillis = { backoffCalls++; 0L })

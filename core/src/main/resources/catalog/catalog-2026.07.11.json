@@ -234,16 +234,16 @@
       "deviceType": "ROUTER",
       "family": "TP-Link Archer (AC750 single/dual-band de entrada)",
       "firmwareKnown": ["V4/V5 (linha AC750 mais antiga)", "firmware ≤ V6.6_230412 confirmado vulnerável a CVE-2024-57049"],
-      "stage": "DRAFT",
-      "stageReason": "Profile criado nesta rodada por necessidade real, não por planejamento prévio: o Luiz testou o driver do Archer C6 (`tplink_archer_c6_v1`/`TplinkOntDriver`) contra o equipamento físico dele e o login falhou com 'expoente RSA (ee) não encontrado na resposta de getParm'. Investigação mostrou que o equipamento físico do Luiz não é um Archer C6 — é um Archer C20, informado por engano (mesmo padrão de correção já visto com o Nokia G-1425G-A→G-1425G-B). Archer C6 (AC1200, linha mais recente, handshake RSA+AES 'web encrypted password' via `/cgi_gdpr`) e Archer C20 (AC750, linha mais antiga/básica) são do mesmo fabricante mas gerações de hardware/firmware distintas e NÃO intercambiáveis — daí um profile e um driver (`TplinkC20AuthenticationClient`/`TplinkC20OntDriver`, pacote separado, não reaproveita `TplinkAuthCrypto`/`TplinkAuthenticationClient` do C6) totalmente separados, em vez de reaproveitar o profile do C6. Implementação de código concluída nesta rodada (cliente de auth, driver, parser, `tplinkC20ManualCheck`, testes com fakes), mas isso não é evidência de teste real — stage permanece `DRAFT` até a primeira execução real de `tplinkC20ManualCheck` contra a unidade física do Luiz.",
+      "stage": "DISCOVERY_ONLY",
+      "stageReason": "Protocolo real do dispatcher `/cgi` CONFIRMADO nesta rodada por captura via DevTools (Network tab) contra a WebUI real da unidade física do Luiz (2026-07-06, SIG-337/SIG-338) — substitui a hipótese anterior (POST simples + MD5 em `/cgi/login`), que havia sido REFUTADA pelo teste real anterior (HTTP 500). `TplinkC20AuthenticationClient`, `TplinkC20ResponseParser`, `TplinkC20OntDriver`, `TplinkC20Models` e `tplinkC20ManualCheck` foram reescritos do zero para o protocolo real (dispatcher único `POST /cgi?1&1&1&8`, blocos de seção em texto plano, cookie `Authorization: Basic base64(user:pass)`, sem endpoint de login dedicado). Evidência real cobre autenticação (implícita via cookie Basic) e 3 seções de dados (IGD_DEV_INFO+ETH_SWITCH+SYS_MODE, LAN_WLAN, LAN_HOST_ENTRY) — mas essa evidência veio da captura de rede do navegador, não de uma execução do driver Kotlin reescrito contra o hardware. Stage permanece `DISCOVERY_ONLY`, não `READ_ONLY_ALPHA`, até o Luiz rodar `tplinkC20ManualCheck` reescrito contra a unidade física e confirmar que o driver (não só o protocolo em teoria) lê os dados corretamente.",
       "physicalTestAccess": true,
-      "physicalTestAccessNote": "Unidade física do Luiz — o mesmo equipamento antes erroneamente testado como C6 é, na verdade, este Archer C20. Primeira execução real de `tplinkC20ManualCheck` ainda não realizada nesta rodada (driver acabou de ser implementado); é o próximo passo natural, já que o acesso físico existe.",
+      "physicalTestAccessNote": "Unidade física do Luiz, 192.168.0.1. Histórico: primeira execução real de `tplinkC20ManualCheck` (mecanismo especulativo MD5+POST, 2026-07-06) resultou em HTTP 500, refutando aquela hipótese. Na sequência, captura real via DevTools (Network tab) contra a WebUI real do mesmo equipamento (2026-07-06) revelou o protocolo verdadeiro — ver evidências `auth_mechanism`/`webui_menu_structure` abaixo. Próximo passo: rodar `tplinkC20ManualCheck` reescrito contra 192.168.0.1 para confirmar o driver ponta a ponta e promover a `READ_ONLY_ALPHA`.",
       "managementDefaults": {
         "candidateIps": ["192.168.0.1", "192.168.1.1", "tplinkwifi.net"],
-        "ipConfidence": 0.75,
-        "ipConfidenceNote": "192.168.0.1/192.168.1.1 e o hostname tplinkwifi.net são convenção documentada de forma consistente em múltiplas fontes de terceiros (SetupRouter, router-network, 192-168-1-1-ip.co, guias oficiais TP-Link) para a linha Archer em geral, incluindo o C20 especificamente. Confiança um pouco menor que a do C6 (0.85) porque nenhuma destas fontes é a documentação técnica oficial de referência do C20 propriamente dita, só páginas de terceiros e guias de usuário.",
+        "ipConfidence": 0.85,
+        "ipConfidenceNote": "192.168.0.1 confirmado como IP real de gestão da unidade física do Luiz (captura DevTools 2026-07-06), além da convenção já documentada por múltiplas fontes de terceiros para a linha Archer em geral.",
         "managementPort": 80,
-        "managementPortNote": "HTTP por padrão. Nenhuma fonte consultada confirma HTTPS local disponível para esta geração de firmware (diferente do C6, onde há guia oficial de habilitação de HTTPS)."
+        "managementPortNote": "HTTP confirmado real (captura DevTools contra a unidade física, 2026-07-06). HTTPS local não investigado."
       },
       "credentialConvention": {
         "defaultUser": "admin",
@@ -255,11 +255,27 @@
       "fingerprintEvidence": [
         {
           "type": "auth_mechanism",
-          "value": "MECANISMO ESPECULATIVO, não confirmado por fonte primária. Hipótese de trabalho implementada em `TplinkC20AuthenticationClient`: POST de formulário simples `/cgi/login` com corpo `username=<user>&password=<md5(password)>` (hash MD5 do lado do cliente, sem RSA/AES/chave pública do servidor), sessão via cookie de `Set-Cookie`. Baseado por analogia na convenção mais comum de firmwares TP-Link pré-GDPR (linha Archer/TL antiga), não em uma fonte que reproduza literalmente o campo/endpoint do C20.",
-          "confidence": 0.25,
-          "confidenceLevel": "LOW",
-          "source": "Hipótese de trabalho de Diego por analogia com convenção histórica de firmwares TP-Link antigos. Nenhuma fonte consultada nesta pesquisa (CVE-2024-57049/advisory, `AlexandrErohin/TP-Link-Archer-C6U`, `AlexandrErohin/home-assistant-tplink-router`, `ericpignet/home-assistant-tplink_router`) documenta o C20 como modelo testado ou reproduz o corpo/campos exatos do login deste modelo.",
-          "note": "Confiança deliberadamente baixa (0.25). Se a primeira execução real de `tplinkC20ManualCheck` mostrar mecanismo diferente (ex.: Basic Auth puro, senha em claro sem hash, ou até um handshake com chave pública que esta pesquisa não encontrou documentado), `TplinkC20AuthenticationClient` precisa ser reescrito, não só ajustado — ver aviso explícito no próprio ManualCheckRunnerC20.kt."
+          "value": "CONFIRMADO por captura real via DevTools (Network tab) contra a WebUI real da unidade física do Luiz. Autenticação é HTTP Basic Auth (`base64(usuario:senha)`), mas carregada via cookie chamado `Authorization` com valor `Basic <base64>` — não pelo header HTTP `Authorization:` padrão. Não há endpoint de login dedicado: a credencial vai em toda requisição de dados contra o dispatcher único `POST /cgi?<query>` (query string comprovadamente funcional usada pelo driver: `1&1&1&8`), `Content-Type: text/plain`. Implementado em `TplinkC20AuthenticationClient`: como não há endpoint de login separado, a validação de credencial é feita fazendo a primeira leitura real (IGD_DEV_INFO) e checando HTTP 200 + `[error]0` no corpo — decisão de design do driver, não capturada literalmente (a captura real não incluiu um caso de credencial inválida). Substitui integralmente a hipótese anterior (POST simples + MD5 em `/cgi/login`, REFUTED).",
+          "confidence": 0.85,
+          "confidenceLevel": "HIGH",
+          "source": "Captura real via DevTools contra unidade física do Luiz, 2026-07-06 (SIG-337/SIG-338).",
+          "note": "Confidence não é 0.95+ porque o caso de credencial inválida (mapeamento para HTTP 401/403) não foi observado na captura — é o comportamento padrão assumido para HTTP Basic Auth, não confirmado literalmente. Confirmar isso é o próximo passo mais valioso para subir a confiança."
+        },
+        {
+          "type": "webui_menu_structure",
+          "value": "CONFIRMADO por captura real: dispatcher único `POST /cgi?1&1&1&8` (query string variou entre capturas sem relação clara percebida com o corpo — servidor provavelmente ignora a query string e só processa o corpo). Corpo de request em blocos `[NOME_SECAO#0,0,0,0,0,0#0,0,0,0,0,0]indice,qtdCampos` seguido de um campo por linha; sempre com um bloco final `[/cgi/info#...]indice,0` de sessão. Response em blocos `[a,b,c,d,e,f]indice` com linhas `campo=valor`; múltiplas linhas do mesmo índice = múltiplos resultados da seção (ex.: 2 rádios Wi-Fi); bloco especial `[cgi]indice` com conteúdo JS (`var x=...`, `$.ret=0`) é a confirmação de sessão; `[error]0` no final do corpo = sucesso, outros valores = falha (significado exato de códigos != 0 desconhecido). Seções confirmadas: `IGD_DEV_INFO` (campos `modelName`, `description`, `X_TP_isFD`), `ETH_SWITCH` (`numberOfVirtualPorts`), `SYS_MODE` (`mode`), `LAN_WLAN` (`name`, `SSID`, multi-linha por rádio), `LAN_HOST_ENTRY` (`leaseTimeRemaining`, `MACAddress`, `hostName`, `IPAddress`, multi-linha por cliente DHCP).",
+          "confidence": 0.9,
+          "confidenceLevel": "HIGH",
+          "source": "Captura real via DevTools contra unidade física do Luiz, 2026-07-06 (SIG-337/SIG-338) — payloads de request e response reproduzidos literalmente nos testes de `TplinkC20ResponseParserTest`.",
+          "note": "Não confirmado: seção de status de WAN (nome e formato desconhecidos, não capturados) e seção de firmware detalhado (versão tipo '0.9.1 4.0 v0044.0 Build 160815', também não capturada) — ambos ficam `READ_WAN_STATUS`/`READ_FIRMWARE` como capability `UNKNOWN`, não implementados por hipótese. Significado exato do prefixo `[a,b,c,d,e,f]` do response e dos códigos de erro != 0 também não é conhecido."
+        },
+        {
+          "type": "auth_mechanism",
+          "value": "MECANISMO ANTERIOR (POST simples + MD5 em `/cgi/login`) REFUTADO por teste real em 2026-07-06: login retornou HTTP 500 com senha correta. Substituído integralmente pelo mecanismo real confirmado acima.",
+          "confidence": 0.0,
+          "confidenceLevel": "REFUTED",
+          "source": "Execução real de `tplinkC20ManualCheck` (versão anterior do driver) contra 192.168.0.1, 2026-07-06.",
+          "note": "Mantido no catálogo só como histórico de descarte — não usar, não reintroduzir. Código e testes correspondentes foram removidos/reescritos nesta rodada."
         },
         {
           "type": "auth_mechanism",
@@ -267,15 +283,7 @@
           "confidence": 0.75,
           "confidenceLevel": "MEDIUM_HIGH",
           "source": "CVE-2024-57049 / GHSA-qr32-fcm4-m5h9 (GitHub Advisory Database), replicado por múltiplas bases de vulnerabilidade (pentest-tools.com, Tenable, cvedetails.com, cvefeed.io) e pelo relatório original em github.com/Shuanunio/CVE_Requests.",
-          "note": "Esta é a evidência mais forte e mais diretamente verificável desta pesquisa para o C20: confirma que o caminho real de endpoints é `/cgi` (não `/cgi_gdpr` como no C6, não `/cgi-bin/luci` como em firmwares OpenWrt-like), e que a checagem de autorização do firmware é fraca/baseada em header, consistente com uma geração de firmware sem handshake de chave pública. NÃO documenta o mecanismo de login em si (usuário/senha) nem o formato de resposta dos endpoints de leitura — só confirma o prefixo de caminho e um bug de autorização específico. O NetHAL NUNCA usa este bypass como caminho de autenticação (regra inegociável de não bypass de auth) — é citado aqui só como fingerprint/evidência de estrutura de endpoint, não como técnica a replicar."
-        },
-        {
-          "type": "webui_menu_structure",
-          "value": "Endpoints de leitura pós-login assumidos por analogia com o padrão de nomenclatura já usado no C6 (mesmo fabricante): `/cgi/getDeviceInfo`, `/cgi/getWanStatus`, `/cgi/getWifiStatus`, `/cgi/getConnectedClients`. NÃO confirmados para o C20 especificamente.",
-          "confidence": 0.2,
-          "confidenceLevel": "LOW",
-          "source": "Hipótese de trabalho de Diego. O único dado real disponível (CVE-2024-57049) confirma o prefixo `/cgi`, mas não os nomes de recurso específicos abaixo dele.",
-          "note": "`TplinkC20ResponseParser` é defensivo (campos ausentes viram `null`/lista vazia em vez de exceção) por causa desta incerteza, mesma estratégia do parser do C6. Nomes de endpoint e campo precisam ser corrigidos no primeiro `tplinkC20ManualCheck` real."
+          "note": "Consistente com o caminho `/cgi` confirmado por captura real. O NetHAL NUNCA usa este bypass como caminho de autenticação (regra inegociável de não bypass de auth) — citado aqui só como conhecimento de compatibilidade/risco do equipamento."
         },
         {
           "type": "vendor_class_reference",
@@ -283,45 +291,45 @@
           "confidence": 0.9,
           "confidenceLevel": "HIGH",
           "source": "README de cada um dos três repositórios, consultados diretamente nesta pesquisa (WebFetch).",
-          "note": "Confiança alta porque é um fato negativo direto e verificável (ausência confirmada em três listas de modelos), não uma suposição. Reforça a decisão de tratar o mecanismo de auth do C20 como especulativo em vez de reaproveitar qualquer decisão de projeto comunitário — nenhum deles decidiu nada para este modelo."
+          "note": "Não impacta mais a confiança geral tanto quanto antes — agora há evidência primária real (captura DevTools) mais forte que qualquer analogia comunitária."
         },
         {
           "type": "html_title",
           "value": null,
           "confidence": 0.0,
           "confidenceLevel": "NONE_VERIFIED",
-          "source": "Nenhum probe passivo real (GET não autenticado na raiz) foi executado nesta rodada contra a unidade física do Luiz nem contra o emulador oficial do C20.",
-          "note": "Não inventar valor. Próximo passo natural, já que há acesso físico: capturar o título HTML da tela de login antes/durante a primeira execução de `tplinkC20ManualCheck`, mesmo padrão que promoveu o Nokia de DISCOVERY_ONLY para READ_ONLY_ALPHA."
+          "source": "Nenhum probe passivo real (GET não autenticado na raiz) foi executado nesta rodada.",
+          "note": "Não inventar valor. Ainda pendente."
         },
         {
           "type": "http_headers",
           "value": null,
           "confidence": 0.0,
           "confidenceLevel": "NONE_VERIFIED",
-          "source": "Nenhuma fonte pública consultada reproduziu literalmente o header Server: do httpd do Archer C20.",
-          "note": "Não inventar string de header. Pendente de probe HTTP direto contra a unidade física."
+          "source": "Nenhuma fonte pública ou captura desta rodada reproduziu literalmente o header Server: do httpd do Archer C20.",
+          "note": "Não inventar string de header. Ainda pendente."
         },
         {
           "type": "session_behavior",
-          "value": "WebUI provavelmente aceita apenas uma sessão autenticada simultânea — mesmo padrão documentado para a família TP-Link Archer em geral, incluindo o C6.",
-          "confidence": 0.4,
-          "confidenceLevel": "LOW_MEDIUM",
-          "source": "Extrapolação por família de fabricante (docs/architecture/driver-adoption-strategy.md, docs/drivers/local-drivers-brazil.md), não confirmação específica do C20.",
-          "note": "Confiança mais baixa que a mesma extrapolação no C6 (0.55) porque o C20 é uma geração de firmware distinta o suficiente (mecanismo de auth genuinamente diferente) para que o comportamento de sessão também possa divergir."
+          "value": "Não há conceito de sessão de servidor observado na captura real — cada requisição carrega a credencial completa via cookie `Authorization`, sem token/sessionId de servidor. Diferente do padrão do C6 (sessão via `Set-Cookie` após handshake). Comportamento de concorrência de múltiplas sessões (se o firmware aceita 1 ou N clientes autenticados simultâneos) não foi testado.",
+          "confidence": 0.7,
+          "confidenceLevel": "MEDIUM_HIGH",
+          "source": "Captura real via DevTools contra unidade física do Luiz, 2026-07-06 — ausência de qualquer cookie de sessão de servidor nas capturas observadas.",
+          "note": "Substitui a extrapolação anterior (baseada só em analogia com o C6), que presumia um modelo de sessão de servidor incompatível com o que foi observado na prática."
         }
       ],
       "expectedProtocols": [
-        {"protocol": "HTTP_LOCAL_WEBUI", "detectionState": "SUPPORTED", "note": "Confirmado indiretamente por CVE-2024-57049 (endpoints reais sob `/cgi` respondendo em HTTP) e por múltiplas fontes de terceiros sobre acesso via 192.168.0.1/tplinkwifi.net. Porta 80."},
+        {"protocol": "HTTP_LOCAL_WEBUI", "detectionState": "SUPPORTED", "note": "Confirmado por captura real (DevTools) e por CVE-2024-57049. Porta 80, dispatcher `/cgi`."},
         {"protocol": "HTTPS_LOCAL_WEBUI", "detectionState": "UNKNOWN", "note": "Nenhuma fonte consultada confirma ou nega HTTPS local para esta geração de firmware."},
         {"protocol": "TR-069_CWMP", "detectionState": "UNKNOWN", "note": "Fingerprint passivo apenas, nunca canal de ação local, se existir."},
         {"protocol": "UPNP_IGD", "detectionState": "UNKNOWN", "note": "Comum na linha Archer em geral por convenção de mercado, não confirmado diretamente para o C20 nesta pesquisa."}
       ],
       "capabilities": [
-        {"id": "READ_DEVICE_INFO", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT."},
-        {"id": "READ_WAN_STATUS", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT."},
-        {"id": "READ_WIFI_STATUS", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT."},
-        {"id": "READ_CONNECTED_CLIENTS", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT."},
-        {"id": "READ_FIRMWARE", "state": "UNKNOWN", "reason": "Sem teste real ainda; driver em DRAFT."}
+        {"id": "READ_DEVICE_INFO", "state": "EXPERIMENTAL", "reason": "Protocolo real confirmado por captura DevTools (seções IGD_DEV_INFO+ETH_SWITCH+SYS_MODE), implementado e coberto por teste com fixtures reais em `TplinkC20ResponseParserTest`/`TplinkC20OntDriverTest`. Ainda sem execução do driver reescrito contra hardware real — não promover a AVAILABLE até `tplinkC20ManualCheck` confirmar."},
+        {"id": "READ_WAN_STATUS", "state": "UNKNOWN", "reason": "Seção real de status de WAN não foi capturada nesta rodada — não implementada por hipótese, conforme regra do projeto."},
+        {"id": "READ_WIFI_STATUS", "state": "EXPERIMENTAL", "reason": "Protocolo real confirmado (seção LAN_WLAN), mas parcial: só `name`/`SSID` capturados, sem canal/banda/enabled/segurança. Implementado e testado com fixture real de 2 rádios."},
+        {"id": "READ_CONNECTED_CLIENTS", "state": "EXPERIMENTAL", "reason": "Protocolo real confirmado (seção LAN_HOST_ENTRY), MAC sempre mascarado antes de sair do parser. Implementado e testado com fixture real."},
+        {"id": "READ_FIRMWARE", "state": "UNKNOWN", "reason": "Seção real de versão de firmware detalhada não foi capturada nesta rodada — não implementada por hipótese, conforme regra do projeto."}
       ],
       "knownFirmwareBugs": [
         {
@@ -339,8 +347,8 @@
         "risk": "LOW",
         "note": "Roteador de varejo de entrada, não gerenciado por ACS de operadora na configuração padrão documentada."
       },
-      "confidenceScoreOverall": 0.15,
-      "confidenceScoreOverallNote": "0 de 'match de headers/banners real' (0/0.25 — nenhum probe passivo real executado ainda); 0.05 de 'match de descritor/endpoint canônico' (0.05/0.20 — só o prefixo `/cgi` tem confirmação real via CVE-2024-57049, os nomes de recurso específicos são hipótese de baixa confiança); 0 de 'autenticação testada' (0/0.20 — mecanismo é especulativo, nenhuma execução real, nem mesmo confirmação de terceiros com PoC funcional como existe para o C6); 0 de 'capability sanity check' (0/0.15, sem leitura real); 0.05 de 'firmware/modelo no catálogo offline' (0.05/0.10 — modelo e faixa de firmware conhecidos via CVE, mas não um firmwareKnown tão preciso quanto o do C6); 0.05 de 'evidência comunitária/histórico' (0.05/0.10 — existência confirmada de CVEs e de bugs de família correlata, mas nenhum projeto comunitário testou este modelo especificamente, ao contrário do C6 que tem PoC de terceiros funcional). Total: 0.05+0.05+0.05 = 0.15. Este é o menor score entre os três profiles do catálogo — reflete corretamente que a evidência aqui é a mais fraca de todos: nenhuma fonte primária, nenhuma PoC funcional de terceiros, nenhum projeto comunitário testou o modelo, e o próprio mecanismo de autenticação é uma hipótese de trabalho, não um fato pesquisado. Não promover a `DISCOVERY_ONLY` até pelo menos um probe passivo real (mesmo critério usado no Nokia) e não promover a `READ_ONLY_ALPHA` sem execução real bem-sucedida de `tplinkC20ManualCheck`."
+      "confidenceScoreOverall": 0.55,
+      "confidenceScoreOverallNote": "0.2 de 'match de headers/banners real' (0.2/0.25 — captura DevTools real confirma IP, porta e comportamento do dispatcher, mas falta um probe HTML/header explícito da tela de login); 0.2 de 'match de descritor/endpoint canônico' (0.2/0.20 — dispatcher `/cgi` e formato de bloco confirmados integralmente por captura real); 0.1 de 'autenticação testada' (0.1/0.20 — mecanismo de auth confirmado por captura real e implementado, mas ainda não executado pelo driver Kotlin reescrito contra o hardware; caso de credencial inválida não foi observado na captura, só assumido); 0 de 'capability sanity check' (0/0.15 — parsing validado só contra fixtures de captura, não contra execução ao vivo do driver); 0.05 de 'firmware/modelo no catálogo offline' (0.05/0.10, igual a antes); 0 de 'evidência comunitária/histórico' (0/0.10 — segue sem suporte comunitário, mas isso já não pesa tanto dado que há evidência primária real agora). Total: 0.2+0.2+0.1+0.05 = 0.55. Subiu de 0.10 para 0.55 nesta rodada por causa da captura real via DevTools (SIG-337/SIG-338), que confirma o protocolo de ponta a ponta pela primeira vez. Ainda não promover a `READ_ONLY_ALPHA` sem execução real de `tplinkC20ManualCheck` (reescrito) contra a unidade física do Luiz confirmando o driver, não só o protocolo capturado no navegador."
     }
   ]
 }

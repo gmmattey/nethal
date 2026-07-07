@@ -1,13 +1,13 @@
 package com.nethal.core.driver.tplink
 
 import java.io.IOException
-import java.security.MessageDigest
+import java.util.Base64
 
 /**
- * Motivo de falha de login do Archer C20. Vocabulário menor que o do C6/Nokia porque a
- * evidência disponível para este modelo é mais fraca (ver `tplink_archer_c20_v1` no catálogo) —
- * não há PoC de terceiros nem código de referência que documente um corpo de erro estruturado
- * como `[error]0`/`err_t` para esta família de firmware.
+ * Motivo de falha de login do Archer C20. Vocabulário fechado com base no protocolo real
+ * confirmado por captura via DevTools contra unidade física do Luiz (2026-07-06, ver
+ * SIG-337/SIG-338) — substitui o vocabulário do mecanismo especulativo anterior (MD5+POST,
+ * REFUTED por HTTP 500 em teste real).
  */
 internal enum class TplinkC20LoginFailureReason {
     INVALID_CREDENTIALS,
@@ -21,35 +21,30 @@ internal class TplinkC20LoginException(
 ) : IOException(message)
 
 /**
- * Sessão autenticada contra a WebUI do TP-Link Archer C20 (profile `tplink_archer_c20_v1`).
+ * Sessão autenticada contra a WebUI do TP-Link Archer C20 (profile `tplink_archer_c20_v1`) usando
+ * o protocolo real confirmado por captura via DevTools (Network tab) contra a WebUI real da
+ * unidade física do Luiz em 2026-07-06 (SIG-337/SIG-338) — não mais o mecanismo especulativo
+ * MD5+POST em `/cgi/login` (REFUTED: teste real retornou HTTP 500).
  *
- * **Mecanismo especulativo** — diferente do C6 (onde o handshake RSA+AES "web encrypted
- * password"/`cgi_gdpr` tem confirmação de pesquisa de segurança independente com PoC funcional),
- * não existe fonte primária ou secundária encontrada nesta pesquisa que documente literalmente o
- * corpo/campos do login do Archer C20. A evidência real disponível é indireta:
+ * Mecanismo real:
+ * - Autenticação é **HTTP Basic Auth** (`base64(usuario:senha)`), mas carregada via **cookie**
+ *   chamado `Authorization` com valor `Basic <base64>` — não pelo header HTTP `Authorization:`
+ *   padrão. A captura real mostrou este cookie sendo enviado em toda requisição de dados.
+ * - **Não existe endpoint de login dedicado.** O dispatcher único `POST /cgi?1&1&1&8` (query
+ *   string fixa comprovadamente funcional, capturada para a combinação
+ *   IGD_DEV_INFO+ETH_SWITCH+SYS_MODE) processa a credencial do cookie a cada chamada.
+ * - Como não há um endpoint de login separado, "autenticar" aqui significa **validar a credencial
+ *   fazendo uma primeira leitura real** (IGD_DEV_INFO) e checando HTTP 200 + `[error]0` no corpo.
+ *   Essa é uma decisão de design deste driver, não algo capturado literalmente: a captura real não
+ *   inclui um caso de credencial inválida (não observamos o que o roteador devolve nesse caso), então
+ *   assumimos o padrão HTTP Basic (401 para credencial inválida) e tratamos qualquer corpo sem
+ *   `[error]0` ou sem os campos esperados como falha de autenticação/resposta inesperada,
+ *   nunca como sucesso silencioso.
+ * - Content-Type do POST é `text/plain` (não form-urlencoded, não JSON).
  *
- * - CVE-2024-57049 (ACL bypass, TP-Link Archer C20 firmware ≤ V6.6_230412, GHSA-qr32-fcm4-m5h9):
- *   confirma que a WebUI deste modelo expõe endpoints sob o caminho `/cgi` (não `/cgi_gdpr`, não
- *   `/cgi-bin/luci`), e que parte da checagem de "autorizado" do firmware depende do header
- *   `Referer` (bypass documentado: enviar `Referer: http://tplinkwifi.net` sem sessão válida já
- *   basta para receber 200 em vez de 403 em parte das rotas). Isso é consistente com uma geração
- *   de firmware mais simples que a linha GDPR/RSA do C6, sem handshake de chave pública.
- * - Nenhum projeto comunitário consultado (`AlexandrErohin/TP-Link-Archer-C6U`,
- *   `AlexandrErohin/home-assistant-tplink-router`, `ericpignet/home-assistant-tplink_router`) lista
- *   o Archer C20 entre os modelos testados/suportados — nenhum deles documenta um esquema de auth
- *   confirmado para este modelo especificamente.
- * - A convenção mais comum documentada para firmwares TP-Link desta geração/classe (linha
- *   Archer/TL antiga, pré-GDPR) é login via POST simples de formulário com o campo de senha
- *   transformado em hash MD5 do lado do cliente antes do envio (sem RSA, sem AES, sem chave
- *   pública do servidor) — mas esta pesquisa não encontrou uma fonte que reproduza o nome exato do
- *   campo/endpoint para o C20. A implementação abaixo assume essa hipótese (MD5 simples do campo
- *   de senha, POST em `/cgi/login`, cookie de sessão em `Set-Cookie`) como **melhor palpite**, não
- *   como fato confirmado.
- *
- * Todo o corpo desta classe deve ser tratado como `DISCOVERY_ONLY`/especulativo até a primeira
- * execução real de `tplinkC20ManualCheck` — ver `TplinkC20OntDriver` e o catálogo para o que fica
- * incerto até lá. Se o teste real mostrar que o mecanismo é outro (ex.: Basic Auth puro, ou senha
- * em claro sem hash), esta classe precisa ser reescrita, não só ajustada.
+ * A credencial nunca é logada, persistida ou exposta em texto legível: `sessionCookieValue`
+ * guarda só o valor Base64 do cookie em memória durante a vida da instância, nunca aparece em
+ * mensagem de exceção nem em `toString()`.
  */
 internal class TplinkC20AuthenticationClient(
     private val host: String,
@@ -57,62 +52,73 @@ internal class TplinkC20AuthenticationClient(
 ) {
     private val baseUrl = "http://$host"
 
-    private var sessionCookies: Map<String, String> = emptyMap()
+    /** Query string fixa comprovadamente funcional para IGD_DEV_INFO+ETH_SWITCH+SYS_MODE, capturada real. */
+    private val cgiEndpoint = "$baseUrl/cgi?1&1&1&8"
 
-    val isAuthenticated: Boolean get() = sessionCookies.isNotEmpty()
+    private var authorizationCookieValue: String? = null
 
+    val isAuthenticated: Boolean get() = authorizationCookieValue != null
+
+    /**
+     * Valida a credencial fazendo uma primeira leitura real (IGD_DEV_INFO). Não existe endpoint de
+     * login dedicado neste protocolo — a "autenticação" é implícita em toda chamada de dados via
+     * cookie Basic Auth, então login() aqui é, na prática, a primeira chamada autenticada.
+     */
     @Throws(IOException::class)
     fun login(username: String, password: String) {
-        // Hipótese de trabalho: hash MD5 simples do password, sem chave pública do servidor —
-        // ver nota de classe acima. Username enviado em claro, como convenção comum nesta geração
-        // de firmware doméstico (form login HTML tradicional).
-        val passwordHash = TplinkC20AuthCrypto.md5Hex(password)
-        val requestBody = "username=${urlEncode(username)}&password=${urlEncode(passwordHash)}"
+        val credentialBase64 = Base64.getEncoder().encodeToString("$username:$password".toByteArray(Charsets.UTF_8))
+        val candidateCookie = "Basic $credentialBase64"
 
-        val response = transport.post("$baseUrl/cgi/login", requestBody)
+        val requestBody = TplinkC20ResponseParser.buildRequestBody(
+            listOf("IGD_DEV_INFO" to listOf("modelName", "description", "X_TP_isFD")),
+        )
 
-        val bodyLooksSuccessful = response.statusCode == 200 &&
-            !response.body.contains("error", ignoreCase = true) &&
-            !response.body.contains("fail", ignoreCase = true)
+        val response = transport.post(cgiEndpoint, requestBody, mapOf("Authorization" to candidateCookie))
 
-        if (bodyLooksSuccessful && response.cookies.isNotEmpty()) {
-            sessionCookies = response.cookies
-            return
+        if (response.statusCode == 401 || response.statusCode == 403) {
+            throw TplinkC20LoginException(
+                TplinkC20LoginFailureReason.INVALID_CREDENTIALS,
+                "login falhou: status=${response.statusCode}",
+            )
+        }
+        if (response.statusCode != 200) {
+            throw TplinkC20LoginException(
+                TplinkC20LoginFailureReason.UNEXPECTED_RESPONSE,
+                "login falhou: status=${response.statusCode}",
+            )
         }
 
-        throw TplinkC20LoginException(
-            classifyFailure(response.statusCode, response.body),
-            "login falhou: status=${response.statusCode}",
-        )
+        val errorCode = TplinkC20ResponseParser.extractGlobalErrorCode(response.body)
+        when {
+            errorCode == 0 && response.body.contains("modelName=") -> {
+                authorizationCookieValue = candidateCookie
+                return
+            }
+            errorCode == null -> throw TplinkC20LoginException(
+                TplinkC20LoginFailureReason.UNEXPECTED_RESPONSE,
+                "login falhou: resposta sem marcador [error] reconhecido",
+            )
+            errorCode == 0 -> throw TplinkC20LoginException(
+                TplinkC20LoginFailureReason.UNEXPECTED_RESPONSE,
+                "login falhou: [error]0 mas resposta não contém modelName= (seção ausente/malformada, não é credencial inválida)",
+            )
+            else -> throw TplinkC20LoginException(
+                TplinkC20LoginFailureReason.INVALID_CREDENTIALS,
+                "login falhou: [error]$errorCode",
+            )
+        }
     }
 
+    /**
+     * Faz uma chamada de dados autenticada contra o dispatcher `/cgi`, reenviando o cookie
+     * `Authorization` validado por [login]. `requestBody` deve ser montado via
+     * [TplinkC20ResponseParser.buildRequestBody].
+     */
     @Throws(IOException::class)
-    fun fetchAuthenticated(path: String): String {
-        check(isAuthenticated) { "fetchAuthenticated chamado antes de login() bem-sucedido" }
-        return transport.get("$baseUrl$path", sessionHeaders()).body
-    }
-
-    private fun sessionHeaders(): Map<String, String> {
-        if (sessionCookies.isEmpty()) return emptyMap()
-        return mapOf("Cookie" to sessionCookies.entries.joinToString("; ") { "${it.key}=${it.value}" })
-    }
-
-    private fun classifyFailure(statusCode: Int, body: String): TplinkC20LoginFailureReason = when {
-        statusCode == 401 || statusCode == 403 -> TplinkC20LoginFailureReason.INVALID_CREDENTIALS
-        body.contains("error", ignoreCase = true) || body.contains("fail", ignoreCase = true) ->
-            TplinkC20LoginFailureReason.INVALID_CREDENTIALS
-        body.isBlank() -> TplinkC20LoginFailureReason.UNEXPECTED_RESPONSE
-        else -> TplinkC20LoginFailureReason.UNKNOWN
-    }
-
-    private fun urlEncode(value: String): String =
-        java.net.URLEncoder.encode(value, Charsets.UTF_8.name())
-}
-
-/** MD5 do lado do cliente para o campo de senha — hipótese de trabalho, ver nota de classe acima. */
-internal object TplinkC20AuthCrypto {
-    fun md5Hex(input: String): String {
-        val digest = MessageDigest.getInstance("MD5").digest(input.toByteArray(Charsets.UTF_8))
-        return digest.joinToString("") { "%02x".format(it) }
+    fun fetchAuthenticated(requestBody: String): String {
+        val cookieValue = authorizationCookieValue
+        check(cookieValue != null) { "fetchAuthenticated chamado antes de login() bem-sucedido" }
+        val response = transport.post(cgiEndpoint, requestBody, mapOf("Authorization" to cookieValue))
+        return response.body
     }
 }

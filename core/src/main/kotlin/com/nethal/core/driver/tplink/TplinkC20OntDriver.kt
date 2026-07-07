@@ -22,23 +22,29 @@ internal sealed interface TplinkC20DriverResult {
 }
 
 /**
- * Driver de leitura do TP-Link Archer C20 (profile `tplink_archer_c20_v1`). Orquestra login +
- * endpoints somente-leitura.
+ * Driver de leitura do TP-Link Archer C20 (profile `tplink_archer_c20_v1`), usando o protocolo
+ * real confirmado por captura via DevTools contra unidade física do Luiz (2026-07-06, ver
+ * SIG-337/SIG-338) — substitui a versão anterior baseada na hipótese MD5+POST/JSON (REFUTED por
+ * HTTP 500 em teste real).
  *
- * Este driver existe separado de `TplinkOntDriver` (Archer C6) porque os dois modelos, embora do
- * mesmo fabricante, pertencem a gerações de firmware/hardware diferentes e não são
- * intercambiáveis: o C6 (AC1200, linha mais recente) usa o handshake "web encrypted password"
- * RSA+AES via `/cgi_gdpr`; o C20 (AC750, linha mais antiga/básica) não tem essa rota — foi
- * justamente a tentativa de usar o driver do C6 contra um C20 físico que expôs o erro "expoente
- * RSA (ee) não encontrado na resposta de getParm" (equipamento do Luiz informado por engano como
- * C6, na verdade é um C20). Ver `TplinkC20AuthenticationClient` para o mecanismo assumido
- * (especulativo) para este modelo.
+ * Protocolo real: dispatcher único `POST /cgi?1&1&1&8`, corpo `text/plain` com blocos de seção
+ * (`TplinkC20ResponseParser`), autenticado via cookie `Authorization: Basic <base64>` em toda
+ * chamada — sem endpoint de login dedicado. Capabilities confirmadas nesta rodada:
+ * READ_DEVICE_INFO (IGD_DEV_INFO+ETH_SWITCH+SYS_MODE), READ_WIFI_STATUS (LAN_WLAN, parcial:
+ * name/SSID), READ_CONNECTED_CLIENTS (LAN_HOST_ENTRY). READ_WAN_STATUS e READ_FIRMWARE
+ * permanecem UNKNOWN — seção real não capturada ainda, não implementadas por hipótese.
  *
- * Retry conservador (no máximo 2 tentativas), mesma razão do C6: a WebUI TP-Link tende a aceitar
- * só uma sessão simultânea, então retentativas agressivas arriscam colidir com sessão anterior
- * ainda não expirada.
+ * Continua separado de `TplinkOntDriver` (Archer C6): mesmo fabricante, protocolos totalmente
+ * diferentes (o C6 usa handshake RSA+AES "web encrypted password" via `/cgi_gdpr`; o C20 usa
+ * dispatcher único com Basic Auth via cookie).
  *
- * A credencial passada a [readSnapshot] nunca é retida por esta classe além da chamada de login.
+ * Retry conservador (no máximo 2 tentativas): sem handshake de sessão para colidir, mas mantido
+ * pela mesma razão de qualquer WebUI doméstica local — retentativas agressivas não ajudam contra
+ * falha persistente de credencial/rede.
+ *
+ * A credencial passada a [readSnapshot] nunca é retida por esta classe além da chamada: apenas o
+ * cookie Base64 fica em memória em [TplinkC20AuthenticationClient], nunca persistido, nunca
+ * enviado à nuvem, nunca logado.
  */
 internal class TplinkC20OntDriver(
     private val host: String,
@@ -65,17 +71,34 @@ internal class TplinkC20OntDriver(
                 val client = TplinkC20AuthenticationClient(host, transport)
                 client.login(username, password)
 
-                val deviceInfoJson = client.fetchAuthenticated("/cgi/getDeviceInfo")
-                val wanJson = client.fetchAuthenticated("/cgi/getWanStatus")
-                val wifiJson = client.fetchAuthenticated("/cgi/getWifiStatus")
-                val clientsJson = client.fetchAuthenticated("/cgi/getConnectedClients")
+                val deviceInfoBody = client.fetchAuthenticated(
+                    TplinkC20ResponseParser.buildRequestBody(
+                        listOf(
+                            "IGD_DEV_INFO" to listOf("modelName", "description", "X_TP_isFD"),
+                            "ETH_SWITCH" to listOf("numberOfVirtualPorts"),
+                            "SYS_MODE" to listOf("mode"),
+                        ),
+                    ),
+                )
+                val wifiBody = client.fetchAuthenticated(
+                    TplinkC20ResponseParser.buildRequestBody(listOf("LAN_WLAN" to listOf("name", "SSID"))),
+                )
+                val clientsBody = client.fetchAuthenticated(
+                    TplinkC20ResponseParser.buildRequestBody(
+                        listOf("LAN_HOST_ENTRY" to listOf("leaseTimeRemaining", "MACAddress", "hostName", "IPAddress")),
+                    ),
+                )
 
                 return@withContext TplinkC20DriverResult.Success(
                     TplinkC20DriverSnapshot(
-                        deviceInfo = TplinkC20ResponseParser.parseDeviceInfo(deviceInfoJson),
-                        wan = TplinkC20ResponseParser.parseWanStatus(wanJson),
-                        wifi = TplinkC20ResponseParser.parseWifiStatus(wifiJson),
-                        connectedClients = TplinkC20ResponseParser.parseConnectedClients(clientsJson),
+                        deviceInfo = TplinkC20ResponseParser.parseDeviceInfo(
+                            deviceInfoBody,
+                            deviceInfoIndex = 0,
+                            ethSwitchIndex = 1,
+                            sysModeIndex = 2,
+                        ),
+                        wifi = TplinkC20ResponseParser.parseWifiStatus(wifiBody, lanWlanIndex = 0),
+                        connectedClients = TplinkC20ResponseParser.parseConnectedClients(clientsBody, lanHostEntryIndex = 0),
                     ),
                 )
             } catch (e: TplinkC20LoginException) {
