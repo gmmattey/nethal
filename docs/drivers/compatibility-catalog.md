@@ -60,7 +60,10 @@ firmware individual; firmwares testados ficam em `firmwareKnown[]` dentro do pro
 | `vendor` | string | sim | Nome do fabricante, forma canônica (ex.: `"Nokia"`, `"TP-Link"`). |
 | `model` | string | sim | Modelo exato testado/pesquisado. Nunca genérico ("Archer" sozinho não vale). |
 | `deviceType` | enum | sim | Mesmo vocabulário de `DeviceInfo.DeviceType` em `core` (`ROUTER`, `ONT`, `ONU`, `MESH`, `AP`, `REPEATER`, `UNKNOWN`). |
-| `family` | string | sim | Descrição textual da família/linha do produto, para contexto humano. |
+| `productLine` | string | sim | Descrição textual da família/linha comercial do produto, para contexto humano (ex.: `"Archer"`). Renomeado de `family` (ver changelog `2026-07-07`) para não colidir com `driverFamilyId`, que é outro conceito. |
+| `platformId` | string | sim | Metadado de catálogo identificando a plataforma tecnológica compartilhada (protocolo + autenticação), ex.: `"tplink-encrypted-web"`, `"tplink-legacy-cgi"`, `"nokia-gpon-rsa-aes"`. Ver `docs/architecture/hal-layering-model.md` §5.2/§11.1 — é deliberadamente `String` simples, sem tipo Kotlin próprio nesta rodada. |
+| `driverFamilyId` | string | sim | Chave de resolução no `DriverFamilyRegistry` (`docs/architecture/hal-layering-model.md` §5.5/§10 — implementado desde o passo 4/6). Mapa fixo `driverFamilyId -> DriverFamilyFactory`, montado uma única vez na inicialização do `core` (`com.nethal.core.driver.family.defaultDriverFamilyRegistry()`), nunca via reflection. O valor é a chave literal usada para registrar a factory correspondente (ex.: `"tplink-legacy-cgi-driver"`, registrado por `TpLinkLegacyCgiDriverFamilyFactory`). |
+| `driverConfig` | `JsonElement` | não (default `null`) | Payload opaco de configuração específica do driver (endpoints, seções, mapeamento de campos) que cada Driver Family interpreta do seu próprio jeito. Deliberadamente sem schema comum entre plataformas diferentes (TP-Link vs Nokia) — ver changelog `2026-07-07` (passo 4) para o primeiro schema concreto, o do profile `tplink_archer_c20_v1`/`tplink-legacy-cgi-driver`. Continua `null` para profiles cuja Driver Family ainda não foi criada. |
 | `firmwareKnown` | string[] | sim (pode ser vazio) | Firmwares confirmados por teste real. Vazio até o primeiro teste documentado. |
 | `stage` | enum | sim | Estágio do profile — mesmo vocabulário de `/ciclo-vida-driver`: `DRAFT`, `DISCOVERY_ONLY`, `READ_ONLY_ALPHA`, `READ_ONLY_BETA`, `WRITE_BETA`, `STABLE`, `DEPRECATED`, `BLOCKED`. |
 | `stageReason` | string | sim | Por que o profile está neste estágio agora — obrigatório, nunca deixar implícito. |
@@ -275,8 +278,133 @@ contra a unidade física. Isso é declarado explicitamente no manifesto (`value:
 `confidenceLevel: NONE_VERIFIED`) para as duas evidências mais importantes de fingerprint HTTP
 (título HTML e headers) em ambos os profiles.
 
+## Riscos — `driverConfig` como superfície futura de dado não confiável
+
+`driverConfig` (introduzido no passo 5 do plano de refatoração HAL, preenchido pela primeira vez
+para o TP-Link Archer C20 no passo 4) é um `JsonElement` opaco que cada Driver Family interpreta do
+seu próprio jeito — hoje, seções/campos que viram literalmente o corpo de requisições autenticadas
+enviadas ao equipamento (ver `TpLinkLegacyCgiResponseParser.buildRequestBody` e
+`TpLinkLegacyCgiDriverConfig`).
+
+Isso é seguro **só porque o catálogo hoje é 100% embarcado/local** (`RemoteCatalogSource` em
+`core/catalog/DriverRegistry.kt` é `NoOpRemoteCatalogSource`, nunca busca nada de rede). O sync
+remoto de catálogo é item real do roadmap do produto (spec §8.5), não hipotético — no dia em que
+`RemoteCatalogSource` ganhar implementação real, um manifesto malicioso ou corrompido poderia, sem
+o gate certo, injetar seção/campo arbitrário em uma requisição autenticada contra o roteador do
+usuário. Não é bypass de autenticação nem exfiltração direta de credencial, mas é uma superfície de
+"comando cego vindo de dado remoto não confiável".
+
+**Gate obrigatório antes de qualquer `RemoteCatalogSource` real** (ver também `SECURITY.md`,
+seção "Catalog integrity"):
+
+1. Manifesto remoto deve ser assinado/verificado antes de ser aceito.
+2. Nenhuma Driver Family pode enviar uma seção/campo vindo de `driverConfig` sem checar contra uma
+   allowlist de seções/campos que ela já conhece para o próprio protocolo — presença no JSON nunca
+   deve, por si só, autorizar o envio.
+
+Revisão de segurança: Marisa, 2026-07-07 (passo 4 do plano de refatoração HAL — reorganização do
+C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
+
 ## Changelog
 
+- **2026-07-07 (nota de risco de `driverConfig`, revisão de segurança da Marisa)** — Adiciona a
+  seção "Riscos — `driverConfig` como superfície futura de dado não confiável" acima, ressalva
+  obrigatória da revisão de segurança do passo 4 do plano de refatoração HAL (reorganização do C20
+  como `TpLinkLegacyCgiDriverFamily`). Sem mudança de stage, capability ou comportamento de driver
+  — só documentação do gate exigido antes de qualquer `RemoteCatalogSource` real. Espelhado em
+  `SECURITY.md`, seção "Catalog integrity".
+- **2026-07-07 (driverConfig do TP-Link C20 — passo 4 do plano de refatoração HAL, caso de
+  validação da arquitetura)** — Implementa o passo 4 de `docs/architecture/hal-layering-model.md`
+  §10/§11.3: reorganiza `TplinkC20OntDriver`/`TplinkC20AuthenticationClient`/
+  `TplinkC20ResponseParser`/`TplinkC20Models` (pacote `driver/tplink/`) como a primeira Driver
+  Family real, `TpLinkLegacyCgiDriverFamily` (pacote `driver/family/tplink/legacycgi/`), sem
+  mudança de protocolo/autenticação/retry/capabilities — mesmo comportamento observável de antes,
+  só reorganização estrutural. Ponto central desta entrega: os literais de seção/campo antes
+  hardcoded em `TplinkC20OntDriver.readSnapshot()` (ex.: `listOf("LAN_WLAN" to listOf("name",
+  "SSID"))`) e a constante `TplinkC20AuthenticationClient.LOGIN_VALIDATION_SECTIONS` saem do código
+  e passam a vir de `profile.driverConfig`, seguindo este schema concreto (opaco para o resto do
+  catálogo — só `TpLinkLegacyCgiDriverFamilyFactory` interpreta):
+
+  ```jsonc
+  "driverConfig": {
+    // Bundle único usado tanto para validar a credencial (não há endpoint de login dedicado
+    // neste protocolo) quanto para a leitura de device info — nunca deve divergir do único
+    // bundle com prova real de sucesso.
+    "loginValidationBundle": {
+      "sections": [
+        {"section": "IGD_DEV_INFO", "fields": ["modelName", "description", "X_TP_isFD"]},
+        {"section": "ETH_SWITCH", "fields": ["numberOfVirtualPorts"]},
+        {"section": "SYS_MODE", "fields": ["mode"]},
+        {"section": "/cgi/info", "fields": []}
+      ]
+    },
+    // Índice posicional de cada seção dentro de loginValidationBundle.sections, usado pelo
+    // parser para reencontrar o bloco certo na resposta (protocolo indexa por posição, não por
+    // nome de seção).
+    "deviceInfoIndex": 0,
+    "ethSwitchIndex": 1,
+    "sysModeIndex": 2,
+    "wifiStatusBundle": {
+      "sections": [{"section": "LAN_WLAN", "fields": ["name", "SSID"]}]
+    },
+    "wifiStatusIndex": 0,
+    "connectedClientsBundle": {
+      "sections": [
+        {"section": "LAN_HOST_ENTRY", "fields": ["leaseTimeRemaining", "MACAddress", "hostName", "IPAddress"]}
+      ]
+    },
+    "connectedClientsIndex": 0
+  }
+  ```
+
+  Um segundo profile no mesmo protocolo (ex.: Archer C50 V2, citado como exemplo em
+  `hal-layering-model.md` §9) só precisaria de um `driverConfig` próprio com os nomes de
+  seção/campo daquele modelo — zero Kotlin novo. Novo manifesto `catalog-2026.07.13.json`
+  (`previousManifest: catalog-2026.07.12.json`): só o profile `tplink_archer_c20_v1` ganhou
+  `driverConfig` preenchido (replicando literalmente os valores antes hardcoded no driver); nenhum
+  outro campo, evidência, capability ou `stage` foi alterado — esta reorganização não é promoção de
+  estágio. `DriverFamilyRegistry` (`core/catalog/DriverFamilyRegistry.kt`, infraestrutura do passo
+  6) ganhou sua primeira composição real: `com.nethal.core.driver.family.defaultDriverFamilyRegistry()`
+  registra `TpLinkLegacyCgiDriverFamilyFactory` sob a chave `"tplink-legacy-cgi-driver"` — o fluxo
+  completo (`hal-layering-model.md` §8: Profile → `DriverFamilyRegistry.resolve` → instância →
+  leitura) foi verificado ponta a ponta por um teste de integração novo
+  (`DriverFamilyRegistryIntegrationTest`) que carrega o profile real do catálogo embarcado, resolve
+  a Driver Family via registry e lê um snapshot completo com transporte fake.
+  `ManualCheckRunnerC20.kt` também foi atualizado para resolver o profile via `DriverRegistry` e
+  instanciar a Driver Family via `DriverFamilyRegistry`, em vez de construir o driver antigo
+  diretamente. Achado incidental durante esta entrega (não é mudança de comportamento de
+  driver/protocolo, é gap de modelo de dados): os manifestos `catalog-2026.07.11` a
+  `catalog-2026.07.13` já usavam os valores `"REFUTED"` (`FingerprintConfidenceLevel`) e
+  `"vendor_class_reference"` (`FingerprintEvidenceType`) em `fingerprintEvidence[]`, mas nenhum dos
+  dois existia no enum Kotlin correspondente — nenhum teste carregava essas versões via
+  `DefaultDriverRegistry` até o teste de integração novo desta entrega, então o gap nunca havia
+  quebrado nada em CI. Ambos os valores foram adicionados aos enums (`CompatibilityCatalog.kt`)
+  para o catálogo real carregar sem erro — dado já existente nos manifestos publicados, não uma
+  capability ou comportamento novo.
+- **2026-07-07 (extensão de schema — passo 5 do plano de refatoração HAL)** — Implementa o passo 5 de
+  `docs/architecture/hal-layering-model.md` §10/§11.3: estende `CompatibilityProfile` com três campos
+  novos, preparando o catálogo para a camada de Driver Family que será introduzida nos passos 4 e 6
+  (ainda não executados). Mudanças de schema: (1) campo `family` renomeado para `productLine` — mesma
+  semântica de sempre (linha de produto comercial), só renomeado para não colidir com o novo
+  `driverFamilyId` (colisão de nome apontada em `hal-layering-model.md` §3 item 7); (2) novo campo
+  obrigatório `platformId` (string simples, sem tipo Kotlin — decisão explícita do Luiz de não criar
+  abstração de `Platform` nesta rodada, §11.1); (3) novo campo obrigatório `driverFamilyId` (string
+  simples, ainda **sem nenhuma resolução de código** — é só o nome que a Driver Family correspondente
+  terá quando for criada no passo 4/§10); (4) novo campo opcional `driverConfig` (`JsonElement`,
+  default `null`) — payload opaco de configuração de driver, deliberadamente sem schema comum entre
+  plataformas. Novo manifesto `catalog-2026.07.12.json` (`previousManifest: catalog-2026.07.11.json`):
+  os três profiles existentes (`nokia_g1425gb_v1`, `tplink_archer_c6_v1`, `tplink_archer_c20_v1`)
+  ganharam `platformId`/`driverFamilyId` (`driverConfig` deixado no default `null`, pois nenhuma
+  Driver Family existe ainda para consumi-lo) e tiveram `family` renomeado para `productLine` — nenhum
+  outro campo, evidência, capability ou `stage` foi alterado nesta rodada. Valores escolhidos:
+  Nokia G-1425G-B → `platformId: "nokia-gpon-rsa-aes"` / `driverFamilyId: "nokia-ont-gpon-driver"`;
+  TP-Link Archer C6 → `platformId: "tplink-encrypted-web"` / `driverFamilyId:
+  "tplink-encrypted-web-driver"`; TP-Link Archer C20 → `platformId: "tplink-legacy-cgi"` /
+  `driverFamilyId: "tplink-legacy-cgi-driver"` — todos os seis valores replicam literalmente os
+  identificadores de exemplo já usados em `hal-layering-model.md` §5.2/§5.5/§7, para manter
+  catálogo e arquitetura no mesmo vocabulário desde o primeiro dia. Nenhuma classe `DriverFamily`,
+  `DriverFamilyFactory` ou `DriverFamilyRegistry` foi criada nesta entrega — isso é escopo dos passos
+  4 e 6 do plano de refatoração, ainda não executados; `driverFamilyId` por enquanto é só dado.
 - **2026-07-09 (promoção para READ_ONLY_ALPHA, decisão do Rafael)** — Segunda execução real de
   `nokiaManualCheck` (mesma unidade física do Luiz, SIG-333) trouxe o probe passivo real que faltava
   desde a correção de sequência do dia anterior: título HTML da tela de login capturado —

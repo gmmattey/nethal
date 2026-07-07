@@ -14,10 +14,25 @@ NETHAL is a network hardware abstraction project. Contributions must be safe, do
 
 ## Driver contributions
 
-Every driver must document:
+NETHAL follows a layered HAL architecture, frozen in `docs/architecture/hal-layering-model.md`:
+
+```text
+Vendor → Platform → Protocol → Authentication Strategy → Driver Family → Profile → Capability
+```
+
+**Before writing any driver code, check whether an existing Driver Family already covers the
+protocol/authentication mechanism your target device uses.** If it does, your contribution is a
+new `Profile` in the compatibility catalog (data only, no Kotlin) — see
+`docs/drivers/compatibility-catalog.md`. A new Driver Family (new Kotlin code under
+`core/driver/family/<vendor>/<família>/`) is only justified when the protocol or authentication
+mechanism is genuinely new — see the decision table in `hal-layering-model.md` §9. Do not organize
+new drivers by vendor+model; that duplicates protocol/authentication logic per model instead of per
+platform.
+
+Every driver (or, for a new model reusing an existing Driver Family, every new Profile) must document:
 
 - Vendor
-- Device family
+- Platform / Driver Family it belongs to (existing, or new — with justification per §9)
 - Tested models
 - Tested firmware versions
 - Protocol used

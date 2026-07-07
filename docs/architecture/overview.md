@@ -34,3 +34,26 @@ Sources:
 ## Safety Guard
 
 Mandatory layer before any write action.
+
+## Driver Registry, Driver Family e Compatibility Catalog
+
+A partir de 2026-07-06, o NetHAL segue o modelo de camadas congelado em
+[`hal-layering-model.md`](hal-layering-model.md):
+
+```text
+Vendor → Platform → Protocol → Authentication Strategy → Driver Family → Profile → Capability
+```
+
+`Vendor`, `Platform` e `Profile` são dado puro do catálogo (`CompatibilityProfile`, ver
+`docs/drivers/compatibility-catalog.md`) — nunca ganham lógica em Kotlin. `Authentication Strategy`
+e `Driver Family` são código em `core/auth/` e `core/driver/family/<vendor>/<família>/` — nunca têm
+endpoint/campo de modelo específico hardcoded, recebem essa configuração via `Profile.driverConfig`.
+
+Resolução em runtime: Fingerprint Engine casa evidência contra um `Profile` → `DriverRegistry`
+devolve o `Profile` completo → `DriverFamilyRegistry.resolve(profile)` usa `profile.driverFamilyId`
+para encontrar a `DriverFamilyFactory` registrada e construir a `DriverFamily` já parametrizada →
+Capability Engine consulta `profile.capabilities[]`, nunca pergunta "é TP-Link?".
+
+Um modelo novo no mesmo protocolo (ex.: um segundo Archer na mesma linha "legacy CGI") é só um
+`Profile` novo no catálogo — zero Kotlin. Só um protocolo/mecanismo de autenticação genuinamente
+novo justifica uma Driver Family nova (critério objetivo na §9 do documento de arquitetura).
