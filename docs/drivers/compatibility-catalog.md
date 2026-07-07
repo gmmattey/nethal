@@ -199,6 +199,24 @@ ela precisa avisar explicitamente o usuário sobre essa limitação antes do pri
 como "este equipamento não permite verificar a autenticidade do host antes de enviar sua senha;
 use apenas na sua própria rede confiável". Não é bloqueante para o driver continuar em `DRAFT`.
 
+## Limitação conhecida — TOFU no handshake stok/luci do TP-Link Archer C6
+
+O login do `TpLinkStokLuciDriverFamily` (profile `tplink_archer_c6_stok_v1`) busca a chave pública
+RSA da senha em `POST /cgi-bin/luci/;stok=/login?form=keys` do próprio host, sem certificado nem
+pinagem — mesma classe de risco *trust on first use* (TOFU) já documentada acima para o Nokia,
+inerente ao protocolo desse firmware TP-Link, não uma escolha do NetHAL.
+
+Mitigação já implementada: `TpLinkStokLuciDriverFamily` recusa construir contra qualquer host que
+não seja IP privado (RFC 1918) — mesma guarda `PrivateIpRanges` usada por todos os drivers. Isso
+reduz o risco a "host malicioso dentro da própria LAN do usuário", não elimina o TOFU em si.
+
+**Pendência antes de `READ_ONLY_BETA`**: mesma pendência do Nokia — a Tela 5 (Autenticação) precisa
+avisar explicitamente o usuário sobre essa limitação antes do primeiro login neste profile também.
+Não é bloqueante para o driver continuar em `DISCOVERY_ONLY`.
+
+Revisão de segurança: Marisa, 2026-07-07 (implementação do `TpLinkStokLuciDriverFamily`), aprovado
+com esta ressalva documentada.
+
 ## Nota de mapeamento — `manufacturer` real (`ALCL`) vs. nome comercial (`Nokia`)
 
 A execução real de `nokiaManualCheck` (SIG-333) contra a unidade física confirmou que
@@ -307,6 +325,64 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
 
 ## Changelog
 
+- **2026-07-07 (implementação de `TpLinkStokLuciDriverFamily` — protocolo entendido por pesquisa
+  de terceiros, NUNCA testado contra hardware real)** — Implementa o login (passos 1-5 do
+  handshake, ver abaixo) e uma leitura autenticada simples da plataforma `tplink-stok-luci`, pacote
+  `core/driver/family/tplink/stokluci/` (`TpLinkStokLuciDriverFamily`,
+  `TpLinkStokLuciAuthenticationClient`, `TpLinkStokLuciCrypto`, `TpLinkStokLuciResponseParser`,
+  `TpLinkStokLuciDriverConfig`), seguindo exatamente o mesmo padrão arquitetural do
+  `TpLinkLegacyCgiDriverFamily` (`DriverFamily`/`DriverFamilyFactory`, `HttpTransport` compartilhado,
+  `DriverRetryPolicy`, `AuthenticationStrategy`). Registrado em `DriverFamilyRegistry`
+  (`core/driver/family/DriverFamilies.kt`) sob a chave `"tplink-stok-luci-driver"`.
+
+  Entendimento do protocolo vem da leitura direta do código-fonte real do pacote Python
+  `tplinkrouterc6u` (PyPI, GPL-3.0) — classe `TplinkEncryption` (`tplinkrouterc6u/client/c6u.py`) e
+  `EncryptionWrapper` (`tplinkrouterc6u/common/encryption.py`) — usado só como referência da
+  existência/forma do protocolo, nunca copiado literalmente; a implementação Kotlin é original,
+  usando `javax.crypto`/`java.security` do JDK como qualquer outra Authentication Strategy do
+  projeto. Handshake de login implementado: (1) `POST /cgi-bin/luci/;stok=/login?form=keys` →
+  chave RSA (módulo/expoente hex) para cifrar a senha; (2) `POST /cgi-bin/luci/;stok=/login?form=auth`
+  → sequência + chave RSA de assinatura (diferente da do passo 1, guardada para uso futuro em
+  chamadas autenticadas, não usada no login em si); (3) senha cifrada com RSA **PKCS#1 v1.5**
+  (diferente do mecanismo antigo `tplink-encrypted-web`, que usa RSA sem padding); (4)
+  `POST /cgi-bin/luci/;stok=/login?form=login`, corpo `operation=login&password=<hex>&confirm=true`
+  — sem campo de usuário, batendo com a evidência real já capturada; (5) sucesso extrai `stok` do
+  corpo JSON e `sysauth` do header `Set-Cookie` (via regex, não parser de cookie genérico).
+
+  **Escopo desta entrega e o que ficou de fora:** só os passos 1-5 (login) mais uma leitura
+  autenticada simples (`readStatusRaw`, endpoint `admin/status?form=all&operation=read`, sem
+  envelope AES/assinatura) foram implementados. A etapa 6 completa (chamadas autenticadas com
+  envelope AES-CBC de chave/IV por sessão + campo `sign` assinado com a chave RSA do passo 2, em
+  pedaços de 53 bytes) fica documentada em KDoc mas não implementada — próximo passo. A terceira
+  geração de firmware que a mesma pesquisa de terceiros documenta (`TplinkRouterV1_11`,
+  autenticação só-RSA sem AES, distinguível pelo tamanho da chave RSA da senha: >=512 chars hex =
+  2048-bit vs. <512 = 1024-bit do mecanismo aqui implementado) não foi implementada — só registrada
+  como nota de risco no catálogo, caso o teste real revele que é essa a variante correta.
+
+  **Nunca testado contra hardware real.** `profile.tplink_archer_c6_stok_v1.stage` permanece
+  `DISCOVERY_ONLY` — a implementação existe e está coberta por testes com fake de transporte
+  (`TpLinkStokLuciAuthenticationClientTest`, `TpLinkStokLuciDriverFamilyTest`,
+  `TpLinkStokLuciCryptoTest`, 23 testes novos), mas nenhuma execução real de login aconteceu ainda.
+  `driverConfig` do profile ganhou o primeiro schema desta plataforma (`statusReadPath`,
+  `statusReadQuery`). `ManualCheckRunner` (`core/tooling/ManualCheckRunner.kt`) ganhou um branch
+  novo (`runTplinkC6Stok`) e a task Gradle `tplinkC6StokManualCheck`
+  (`gradlew :core:tplinkC6StokManualCheck --args="<ip> <usuario>"`) — comando a rodar quando o Luiz
+  quiser validar o login contra a unidade física real; o resultado (sucesso ou falha) deve ser
+  reportado para atualizar `stage`/`fingerprintEvidence[]`/`confidenceScoreOverall` do profile, não
+  promovido sem esse teste (`/ciclo-vida-driver`).
+
+  Novo manifesto `catalog-2026.07.15.json` (`previousManifest: catalog-2026.07.14.json`): só o
+  profile `tplink_archer_c6_stok_v1` foi alterado — ganhou `driverConfig`, duas novas entradas de
+  `fingerprintEvidence[]` do tipo `auth_mechanism` (o handshake detalhado entendido via leitura de
+  código de terceiros, e a nota sobre a terceira geração de firmware não implementada), e
+  `stageReason`/`confidenceScoreOverallNote` atualizados para refletir que a implementação existe
+  mas segue sem validação real. `confidenceScoreOverall` permanece `0.35` — a heurística de score
+  não tem categoria para "existe implementação", só para evidência real contra o equipamento, então
+  nenhuma categoria muda até o teste real acontecer. `loadEmbeddedCatalogResource()` (default de
+  `DriverRegistry.kt`) atualizado para apontar para o novo manifesto, seguindo a rede de segurança
+  já existente (`DriverRegistryTest`, "default embedded manifest is the newest catalog file in
+  resources") que detecta esse tipo de drift automaticamente.
+
 - **2026-07-07 (TP-Link Archer C6 tem duas plataformas por firmware — refutação real + profile
   novo `tplink_archer_c6_stok_v1`)** — Teste real contra a unidade física de teste do Luiz (Archer
   C6, recém resetada de fábrica, IP `192.168.0.1`) refutou o mecanismo que o profile
@@ -353,15 +429,12 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   Este é o primeiro caso real (não hipotético) em que o mesmo vendor+modelo comercial exige dois
   profiles distintos por divergência genuina de plataforma entre gerações de firmware — documentado
   em detalhe em `docs/architecture/hal-layering-model.md`, nova seção "Caso real — TP-Link Archer C6
-  com duas plataformas por firmware". Gap conhecido registrado no mesmo documento (não corrigido
-  nesta rodada): `DriverRegistry.findProfile(vendor, model)` usa `firstOrNull` e assume um único
-  profile por vendor+modelo — com dois profiles TP-Link/Archer C6 agora reais no catálogo, essa
-  função fica ambígua (sempre resolve para `tplink_archer_c6_v1`, o primeiro no array, mesmo quando
-  a unidade real do usuário roda `tplink_archer_c6_stok_v1`). Usado hoje só pelo fluxo de
-  identificação manual (Tela 3) — o `FingerprintEngine` automático já não tem esse problema, porque
-  pontua todos os profiles por evidência em vez de buscar por vendor+modelo. Nenhum código Kotlin
-  de driver foi implementado ou alterado nesta rodada (`core/driver/`, `core/auth/` intocados) —
-  isso é trabalho de catálogo/pesquisa, esperando por teste real de login bem-sucedido antes de
+  com duas plataformas por firmware". Gap de `DriverRegistry.findProfile(vendor, model)` (assumia um
+  único profile por vendor+modelo, ficando ambíguo com os dois profiles TP-Link/Archer C6) já
+  **corrigido** — ver "Gap corrigido" no mesmo documento: `DriverRegistry` ganhou
+  `findProfiles(vendor, model)`, que devolve todos os matches. Nenhum código Kotlin de driver foi
+  implementado ou alterado nesta rodada (`core/driver/`, `core/auth/` intocados) — isso é trabalho de
+  catálogo/pesquisa, esperando por teste real de login bem-sucedido antes de
   qualquer implementação de Driver Family nova.
 
 - **2026-07-07 (nota de risco de `driverConfig`, revisão de segurança da Marisa)** — Adiciona a

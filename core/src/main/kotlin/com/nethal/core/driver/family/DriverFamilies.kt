@@ -2,6 +2,7 @@ package com.nethal.core.driver.family
 
 import com.nethal.core.catalog.DriverFamilyRegistry
 import com.nethal.core.driver.family.tplink.legacycgi.TpLinkLegacyCgiDriverFamilyFactory
+import com.nethal.core.driver.family.tplink.stokluci.TpLinkStokLuciDriverFamilyFactory
 
 /**
  * Ponto central de composição do [DriverFamilyRegistry] real do `core` — monta o mapa fixo
@@ -22,5 +23,6 @@ import com.nethal.core.driver.family.tplink.legacycgi.TpLinkLegacyCgiDriverFamil
 fun defaultDriverFamilyRegistry(): DriverFamilyRegistry = DriverFamilyRegistry(
     listOf(
         TpLinkLegacyCgiDriverFamilyFactory(),
+        TpLinkStokLuciDriverFamilyFactory(),
     ),
 )

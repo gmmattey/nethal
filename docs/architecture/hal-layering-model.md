@@ -446,29 +446,35 @@ Profile "TP-Link Archer C6", este caso teria virado uma mistura confusa de campo
 dentro de um único profile, ou pior, teria sido tratado como "bug" do profile existente em vez de
 "plataforma nova".
 
-### Gap conhecido — `DriverRegistry.findProfile(vendor, model)` fica ambíguo com dois profiles
+### Gap corrigido — `DriverRegistry.findProfile(vendor, model)` era ambíguo com dois profiles
 
 `DriverRegistry.findProfile(vendor, model)` (`core/src/main/kotlin/com/nethal/core/catalog/
-DriverRegistry.kt`) resolve com `currentManifest.profiles.firstOrNull { vendor+model match }` —
-assume implicitamente **um único profile por combinação vendor+modelo**. Com dois profiles reais
-TP-Link/Archer C6 no catálogo agora, essa função é genuinamente ambígua: sempre devolve
+DriverRegistry.kt`) resolvia com `currentManifest.profiles.firstOrNull { vendor+model match }` —
+assumia implicitamente **um único profile por combinação vendor+modelo**. Com dois profiles reais
+TP-Link/Archer C6 no catálogo, essa função era genuinamente ambígua: sempre devolvia
 `tplink_archer_c6_v1` (primeiro no array), mesmo quando a unidade física do usuário roda a
-plataforma `tplink-stok-luci`. Essa função é usada hoje pelo fluxo de identificação manual (Tela 3,
-spec §11) — um usuário que digitar "TP-Link" + "Archer C6" manualmente sempre cai no profile errado
-para uma unidade `stok`/luci real.
+plataforma `tplink-stok-luci`.
 
 O `FingerprintEngine` automático (`core/src/main/kotlin/com/nethal/core/fingerprint/
-FingerprintEngine.kt`) **não tem esse problema**: ele pontua todos os profiles do catálogo contra a
-evidência coletada (§5.3/§8 passo 2) e escolhe pelo score, nunca busca por vendor+modelo — os dois
-profiles TP-Link C6 vão competir normalmente pela evidência real (o `stok`/luci deve pontuar mais
-alto contra uma unidade que exiba a estrutura `/webpages/login.html` + `/cgi-bin/luci`, o
-`encrypted-web` deve pontuar mais alto contra uma unidade que responda em `/cgi/getParm`).
+FingerprintEngine.kt`) **nunca teve esse problema**: ele pontua todos os profiles do catálogo contra
+a evidência coletada (§5.3/§8 passo 2) e escolhe pelo score, nunca busca por vendor+modelo — os dois
+profiles TP-Link C6 competem normalmente pela evidência real (o `stok`/luci deve pontuar mais alto
+contra uma unidade que exiba a estrutura `/webpages/login.html` + `/cgi-bin/luci`, o `encrypted-web`
+deve pontuar mais alto contra uma unidade que responda em `/cgi/getParm`).
 
-Registrado aqui como **gap conhecido, não corrigido nesta rodada** — é puramente trabalho de
-catálogo/pesquisa (nenhum driver Kotlin novo foi implementado para este caso), e a correção de
-`findProfile` pertence ao Bruno (mudança de interface pública do `DriverRegistry`), não ao escopo de
-Diego. Fica como pendência explícita para quando a Tela 3 (identificação manual) for implementada
-ou revisada — ver `docs/product/specification.md` §11.
+**Correção aplicada:** `DriverRegistry` ganhou `findProfiles(vendor, model): List<CompatibilityProfile>`,
+que devolve todos os profiles que casam com vendor+modelo (hoje, os dois profiles TP-Link/Archer C6).
+`findProfile` (singular) continua existindo — nenhum código de produção real dependia dele no caso
+ambíguo, o único uso fora de teste era `ManualCheckRunner` (ferramenta CLI de teste manual) contra
+`Archer C20`, que só tem um profile no catálogo — mas passou a ser documentado explicitamente como
+atalho que "escolhe o primeiro quando há ambiguidade, sem resolver o conflito"; qualquer chamador que
+precise decidir entre profiles concorrentes deve usar `findProfiles`. A Tela 3 (identificação manual,
+spec §11) segue sem implementação de UI no `app` — quando for implementada, deve consumir
+`findProfiles` e apresentar a escolha ao usuário quando houver mais de um match.
+
+Teste de regressão: `DriverRegistryTest` (`core/src/test/kotlin/com/nethal/core/catalog/
+DriverRegistryTest.kt`) — `findProfiles returns every profile that matches vendor and model,
+including ambiguous TP-Link Archer C6 case`.
 
 ---
 

@@ -5,6 +5,9 @@ import com.nethal.core.catalog.loadEmbeddedCatalogResource
 import com.nethal.core.driver.family.defaultDriverFamilyRegistry
 import com.nethal.core.driver.family.tplink.legacycgi.TpLinkLegacyCgiDriverFamily
 import com.nethal.core.driver.family.tplink.legacycgi.TpLinkLegacyCgiReadOutcome
+import com.nethal.core.driver.family.tplink.stokluci.TpLinkStokLuciDriverFamily
+import com.nethal.core.driver.family.tplink.stokluci.TpLinkStokLuciLoginOutcome
+import com.nethal.core.driver.family.tplink.stokluci.TpLinkStokLuciStatusOutcome
 import com.nethal.core.driver.nokia.NokiaDriverResult
 import com.nethal.core.driver.nokia.NokiaOntDriver
 import com.nethal.core.driver.tplink.TplinkCipherVariant
@@ -62,6 +65,7 @@ private enum class ManualCheckProfile(val profileId: String, val displayName: St
     TPLINK_C6("tplink_archer_c6_v1", "TP-Link Archer C6"),
     NOKIA("nokia_g1425gb_v1", "Nokia G-1425G-B"),
     TPLINK_C20("tplink_archer_c20_v1", "TP-Link Archer C20"),
+    TPLINK_C6_STOK("tplink_archer_c6_stok_v1", "TP-Link Archer C6 (plataforma stok/luci)"),
     ;
 
     companion object {
@@ -98,6 +102,7 @@ fun main(args: Array<String>) {
         ManualCheckProfile.TPLINK_C6 -> runTplinkC6(ip, username, cipherVariantArg = remainingArgs.getOrNull(2))
         ManualCheckProfile.NOKIA -> runNokia(ip, username)
         ManualCheckProfile.TPLINK_C20 -> runTplinkC20(ip, username)
+        ManualCheckProfile.TPLINK_C6_STOK -> runTplinkC6Stok(ip, username)
     }
 }
 
@@ -105,6 +110,7 @@ private fun printUsage() {
     println("Uso: gradlew :core:tplinkManualCheck --args=\"<ip> <usuario> [cbc|gcm]\"")
     println("   ou gradlew :core:nokiaManualCheck --args=\"<ip> <usuario>\"")
     println("   ou gradlew :core:tplinkC20ManualCheck --args=\"<ip> <usuario>\"")
+    println("   ou gradlew :core:tplinkC6StokManualCheck --args=\"<ip> <usuario>\"")
     println("(cada task já injeta o profileId correto; não é preciso digitá-lo)")
     println("Profiles reconhecidos por este runner: ${ManualCheckProfile.entries.joinToString(", ") { it.profileId }}")
     println("A senha é pedida depois, de forma interativa — nunca via argumento.")
@@ -287,6 +293,86 @@ private fun runTplinkC20(ip: String, username: String) {
         is TpLinkLegacyCgiReadOutcome.Failure -> {
             println("Falha: ${result.reason} — ${result.message}")
             println("Se a falha for de credencial/resposta inesperada, capture com uma ferramenta de rede (DevTools do navegador contra a WebUI real) o corpo de resposta e reporte para corrigir o catálogo/driver — não tente contornar autenticação manualmente.")
+        }
+    }
+}
+
+// --- TP-Link Archer C6, plataforma stok/luci (tplink_archer_c6_stok_v1) — via DriverRegistry/DriverFamilyRegistry. ---
+// ATENÇÃO: este mecanismo NUNCA foi testado contra hardware real. O entendimento do protocolo vem
+// de pesquisa em código aberto de terceiros (pacote `tplinkrouterc6u`, GPL-3.0) — ver KDoc de
+// TpLinkStokLuciAuthenticationClient. O profile continua DISCOVERY_ONLY até este runner produzir
+// o primeiro teste real bem-sucedido; qualquer falha aqui deve ser documentada no catálogo
+// (fingerprintEvidence[] com confidenceLevel apropriado), nunca contornada manualmente.
+
+private fun runTplinkC6Stok(ip: String, username: String) {
+    val password = readPasswordInteractively("TP-Link Archer C6 (plataforma stok/luci)")
+    if (password.isBlank()) {
+        println("Senha vazia, abortando.")
+        return
+    }
+
+    val registry = DefaultDriverRegistry(
+        embeddedManifestLoader = { loadEmbeddedCatalogResource() },
+    )
+    val profile = registry.findProfiles(vendor = "TP-Link", model = "Archer C6")
+        .firstOrNull { it.profileId == "tplink_archer_c6_stok_v1" }
+    if (profile == null) {
+        println("Profile tplink_archer_c6_stok_v1 não encontrado no catálogo embarcado — catálogo desatualizado?")
+        return
+    }
+
+    println("Conectando em $ip como \"$username\" (profile=${profile.profileId}, driverFamilyId=${profile.driverFamilyId})...")
+    println("AVISO: este mecanismo nunca foi validado contra hardware real — protocolo entendido só por pesquisa de terceiros (tplinkrouterc6u, GPL-3.0). Reporte o resultado (sucesso ou falha) para atualizar o catálogo.")
+
+    val driverFamilyRegistry = defaultDriverFamilyRegistry()
+    val httpTransport = DefaultHttpTransport(
+        HttpTransportConfig(
+            connectTimeoutMillis = 10_000,
+            getReadTimeoutMillis = 20_000,
+            postReadTimeoutMillis = 20_000,
+            getAcceptHeader = "application/json, text/html,*/*;q=0.9",
+            postAcceptHeader = "application/json, text/plain, */*",
+            postContentType = "application/x-www-form-urlencoded",
+            postRefererProvider = { url ->
+                val base = URL(url)
+                "${base.protocol}://${base.host}${if (base.port !in listOf(-1, 80, 443)) ":${base.port}" else ""}/webpages/index.html"
+            },
+            followRedirectsManually = false,
+        ),
+    )
+
+    val driver = try {
+        driverFamilyRegistry.resolve(profile, ip, httpTransport) as TpLinkStokLuciDriverFamily
+    } catch (e: IllegalArgumentException) {
+        println("Host recusado: ${e.message}")
+        return
+    }
+
+    val loginResult = runBlocking { driver.login(username, password) }
+    when (loginResult) {
+        is TpLinkStokLuciLoginOutcome.Success -> {
+            println()
+            println("--- Login bem-sucedido ---")
+            println("stok=${loginResult.session.stok.take(6)}... (truncado, nunca logar o token completo)")
+            println("(copie o resultado deste teste — sucesso ou falha — para o catálogo de compatibilidade, profile tplink_archer_c6_stok_v1)")
+
+            println()
+            println("Tentando leitura de status geral...")
+            val statusResult = runBlocking { driver.readStatusRaw(username, password) }
+            when (statusResult) {
+                is TpLinkStokLuciStatusOutcome.Success -> {
+                    println("--- Status (corpo bruto, JSON) ---")
+                    println(statusResult.rawBody)
+                    println("(schema ainda não mapeado — antes de colar isso no catálogo, mascare SSID, MAC completo e IP público, mesma regra de sanitização da spec §8.9)")
+                }
+                is TpLinkStokLuciStatusOutcome.Failure -> {
+                    println("Falha na leitura de status: ${statusResult.reason} — ${statusResult.message}")
+                }
+            }
+        }
+        is TpLinkStokLuciLoginOutcome.Failure -> {
+            println("Falha: ${loginResult.reason} — ${loginResult.message}")
+            println("Se a falha for de resposta inesperada, capture com uma ferramenta de rede (DevTools do navegador contra a WebUI real) o corpo de resposta dos endpoints form=keys/form=auth/form=login e reporte para corrigir o catálogo/driver — não tente contornar autenticação manualmente.")
         }
     }
 }
