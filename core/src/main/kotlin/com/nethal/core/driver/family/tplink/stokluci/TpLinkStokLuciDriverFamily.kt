@@ -47,9 +47,14 @@ internal sealed interface TpLinkStokLuciSnapshotOutcome {
  * ([readStatusRaw]) e, desde esta rodada, o parsing estruturado desse payload para o vocabulário de
  * capabilities do NetHAL ([readSnapshot], via [TpLinkStokLuciStatusParser]) — cobre
  * `READ_WIFI_STATUS`, `READ_LAN_STATUS`, `READ_WAN_STATUS` e `READ_CONNECTED_CLIENTS`
- * ([SUPPORTED_CAPABILITIES]). `READ_DEVICE_INFO`/`READ_FIRMWARE` continuam fora de escopo: o
- * payload de `admin/status?form=all` capturado até aqui não trouxe evidência de campo de
- * modelo/firmware.
+ * ([SUPPORTED_CAPABILITIES]). `READ_DEVICE_INFO`/`READ_FIRMWARE` continuam fora de escopo:
+ * revisão dedicada em 2026-07-07 (mapeamento de capabilities restantes) checou o corpo de resposta
+ * de toda chamada já capturada ao vivo deste fluxo (`form=keys`, `form=auth`, `form=login`,
+ * `admin/status?form=all`) e nenhuma delas carrega campo de vendor/modelo/versão de firmware — ver
+ * `docs/drivers/compatibility-catalog.md` (changelog) para o detalhe. Guest network
+ * (`guest_2g_ssid`/`guest_5g_ssid`) permanece modelada como rádio adicional dentro de
+ * `READ_WIFI_STATUS` — não existe capability própria para rede de convidados no vocabulário oficial
+ * (`CapabilityId`), decisão revisada e mantida na mesma rodada.
  *
  * O ciclo de correções desta Driver Family passou por várias rodadas de `INVALID_CREDENTIALS`
  * (HTTP 403) até convergir com a captura real do hardware do Luiz (Archer C6 v2.0, firmware

@@ -327,6 +327,62 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
 
 ## Changelog
 
+- **2026-07-07 (mapeamento das capabilities restantes do `tplink-stok-luci`, manifesto
+  `catalog-2026.07.21.json`)** — Revisão dos três pontos em aberto deixados pela rodada anterior
+  (parser estruturado + ADR 0001), sem coleta de evidência ao vivo nova. Nenhuma capability nova
+  entrou em `SUPPORTED_CAPABILITIES`/`TpLinkStokLuciStatusParser` nesta rodada — é uma rodada de
+  documentação/decisão, não de implementação.
+
+  1. **`READ_DEVICE_INFO`/`READ_FIRMWARE` continuam `UNKNOWN`.** Checado o corpo de resposta de
+     todas as chamadas já capturadas ao vivo do fluxo `tplink-stok-luci` (`form=keys`, `form=auth`,
+     `form=login`, `admin/status?form=all`, ver `docs/drivers/live-evidence/tplink-archer-c6-stok-v1.json`)
+     — nenhuma delas carrega campo de vendor/modelo/versão de firmware. O modelo/firmware
+     conhecidos desta unidade (`Archer C6 v2.0`, `1.1.10 Build 20230830 rel.69433(5553)`) são
+     metadado de identificação manual da unidade física de teste, não um campo de API parseado —
+     não há como preencher `READ_DEVICE_INFO`/`READ_FIRMWARE` sem inventar heurística. Nenhum
+     endpoint novo foi chamado nesta rodada por falta de evidência ao vivo (regra explícita da
+     tarefa: sem evidência, documenta `UNKNOWN`, não inventa).
+
+  2. **Guest network confirmada sem capability própria — decisão mantida.** Revisão do vocabulário
+     oficial (`docs/drivers/driver-model.md`, `core/src/main/kotlin/com/nethal/core/model/Capability.kt`
+     — `CapabilityId` completo) confirma que não existe `READ_GUEST_NETWORK_STATUS` nem
+     equivalente. A modelagem já em produção desde a rodada anterior (`guest_2g_ssid`/
+     `guest_5g_ssid` como entradas de `TpLinkStokLuciWifiRadio` com `guestNetwork=true`, dentro de
+     `READ_WIFI_STATUS`) permanece — não é proposta capability nova unilateralmente (decisão de
+     vocabulário é do Rafael, ver `/modelo-capacidades`). Fica resolvido o "gap a discutir com
+     Rafael" sinalizado na entrada de changelog anterior: a conclusão é manter como está, não que
+     falte decisão.
+
+  3. **Campos observados sem capability correspondente no vocabulário atual — nenhum parser
+     implementado, listados só para referência futura:**
+     - `wireless_2g_wps_state` (estado de WPS) — não existe capability dedicada de WPS no
+       vocabulário.
+     - `storage_*`, `usb_available`, `printer_*` (compartilhamento USB/armazenamento/impressora) —
+       não existe capability de armazenamento ou impressora no vocabulário.
+     - `modem_*` — prefixo observado sem nome/conteúdo de campo exato confirmado; insuficiente para
+       mapear com segurança para `READ_WAN_STATUS` ou qualquer outra capability sem forçar
+       mapeamento sem evidência.
+
+     Nenhum desses campos ganhou implementação de parser nesta rodada — regra explícita da tarefa
+     de não forçar mapeamento onde não há capability correspondente clara.
+
+  4. **Correção de consistência incidental:** o texto de `reason` de `READ_WIFI_STATUS`/
+     `READ_LAN_STATUS`/`READ_CONNECTED_CLIENTS` em `catalog-2026.07.20.json` ainda descrevia SSID
+     como hash SHA-256 e MAC sempre mascarado — texto nunca atualizado quando a ADR 0001 corrigiu o
+     modelo do driver para dado bruto. Corrigido em `catalog-2026.07.21.json` para refletir o
+     comportamento real do código (`TpLinkStokLuciStatusParser`/`TpLinkStokLuciModels.kt`) desde a
+     ADR.
+
+  **Estágio do profile:** permanece `READ_ONLY_ALPHA`, sem promoção (fora de escopo desta rodada).
+  `confidenceScoreOverall` permanece `0.75` — rodada de revisão/documentação, sem evidência ao vivo
+  nova.
+
+  **Testes:** nenhum teste novo — `SUPPORTED_CAPABILITIES` de `TpLinkStokLuciDriverFamily` não
+  mudou (`TpLinkStokLuciDriverFamilyTest` já cobre isso). Ajustadas as asserções de
+  `manifestVersion` (`"2026.07.20"` → `"2026.07.21"`) em `DriverRegistryTest` e
+  `FingerprintEngineTest` para o novo manifesto embarcado default; `loadEmbeddedCatalogResource()`
+  atualizada para `catalog/catalog-2026.07.21.json`.
+
 - **2026-07-07 (ADR 0001 — modelo do `tplink-stok-luci` passa a carregar SSID/MAC brutos)** —
   `docs/architecture/adr/0001-fronteira-sanitizacao-telemetria.md` (Rafael) decidiu que
   sanitização de dado sensível (hash de SSID, mascaramento de MAC) não é responsabilidade do
