@@ -56,7 +56,12 @@ internal class FakeTpLinkStokLuciHttpTransport(
     override fun get(url: String, extraHeaders: Map<String, String>): HttpTransportResponse =
         HttpTransportResponse(404, "", emptyMap(), emptyMap())
 
-    override fun post(url: String, body: String, cookies: Map<String, String>): HttpTransportResponse {
+    override fun post(
+        url: String,
+        body: String,
+        cookies: Map<String, String>,
+        extraHeaders: Map<String, String>,
+    ): HttpTransportResponse {
         postCallCount++
         postedUrls.add(url)
         return when {

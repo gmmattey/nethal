@@ -27,7 +27,12 @@ interface HttpTransport {
     fun get(url: String, extraHeaders: Map<String, String> = emptyMap()): HttpTransportResponse
 
     @Throws(IOException::class)
-    fun post(url: String, body: String, cookies: Map<String, String> = emptyMap()): HttpTransportResponse
+    fun post(
+        url: String,
+        body: String,
+        cookies: Map<String, String> = emptyMap(),
+        extraHeaders: Map<String, String> = emptyMap(),
+    ): HttpTransportResponse
 }
 
 /**
@@ -114,7 +119,12 @@ class DefaultHttpTransport(private val config: HttpTransportConfig) : HttpTransp
         return readResponse(connection)
     }
 
-    override fun post(url: String, body: String, cookies: Map<String, String>): HttpTransportResponse {
+    override fun post(
+        url: String,
+        body: String,
+        cookies: Map<String, String>,
+        extraHeaders: Map<String, String>,
+    ): HttpTransportResponse {
         val bodyBytes = body.toByteArray(Charsets.UTF_8)
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -132,6 +142,7 @@ class DefaultHttpTransport(private val config: HttpTransportConfig) : HttpTransp
             if (cookies.isNotEmpty()) {
                 setRequestProperty("Cookie", cookies.entries.joinToString("; ") { "${it.key}=${it.value}" })
             }
+            extraHeaders.forEach { (k, v) -> setRequestProperty(k, v) }
             setFixedLengthStreamingMode(bodyBytes.size)
             outputStream.write(bodyBytes)
             outputStream.flush()

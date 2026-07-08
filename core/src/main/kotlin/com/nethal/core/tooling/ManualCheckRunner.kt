@@ -7,6 +7,7 @@ import com.nethal.core.driver.family.tplink.legacycgi.TpLinkLegacyCgiDriverFamil
 import com.nethal.core.driver.family.tplink.legacycgi.TpLinkLegacyCgiReadOutcome
 import com.nethal.core.driver.family.tplink.stokluci.TpLinkStokLuciDriverFamily
 import com.nethal.core.driver.family.tplink.stokluci.TpLinkStokLuciLoginOutcome
+import com.nethal.core.driver.family.tplink.stokluci.TpLinkStokLuciSnapshotOutcome
 import com.nethal.core.driver.family.tplink.stokluci.TpLinkStokLuciStatusOutcome
 import com.nethal.core.driver.nokia.NokiaDriverResult
 import com.nethal.core.driver.nokia.NokiaOntDriver
@@ -377,10 +378,31 @@ private fun runTplinkC6Stok(ip: String, username: String) {
                 is TpLinkStokLuciStatusOutcome.Success -> {
                     println("--- Status (corpo bruto, JSON) ---")
                     println(statusResult.rawBody)
-                    println("(schema ainda não mapeado — antes de colar isso no catálogo, mascare SSID, MAC completo e IP público, mesma regra de sanitização da spec §8.9)")
+                    println("(schema já mapeado por TpLinkStokLuciStatusParser abaixo — antes de colar este corpo bruto no catálogo, mascare SSID, MAC completo e IP público, mesma regra de sanitização da spec §8.9)")
                 }
                 is TpLinkStokLuciStatusOutcome.Failure -> {
                     println("Falha na leitura de status: ${statusResult.reason} — ${statusResult.message}")
+                }
+            }
+
+            println()
+            println("Tentando leitura estruturada (readSnapshot)...")
+            val snapshotResult = runBlocking { driver.readSnapshot(username, password) }
+            when (snapshotResult) {
+                is TpLinkStokLuciSnapshotOutcome.Success -> {
+                    val snapshot = snapshotResult.snapshot
+                    println("--- Wi-Fi (READ_WIFI_STATUS) ---")
+                    if (snapshot.wifi.isEmpty()) println("(nenhum rádio interpretado)") else snapshot.wifi.forEach(::println)
+                    println("--- LAN (READ_LAN_STATUS) ---")
+                    println(snapshot.lan?.toString() ?: "(não disponível / campo ausente no payload)")
+                    println("--- WAN (READ_WAN_STATUS) ---")
+                    println(snapshot.wan?.toString() ?: "(não disponível / campo ausente no payload)")
+                    println("--- Clientes conectados (READ_CONNECTED_CLIENTS) ---")
+                    if (snapshot.connectedClients.isEmpty()) println("(nenhum cliente interpretado)") else snapshot.connectedClients.forEach(::println)
+                    println("(dados já sanitizados — SSID em hash, MAC mascarado, senha do Wi-Fi nunca lida — seguros para colar no catálogo de compatibilidade)")
+                }
+                is TpLinkStokLuciSnapshotOutcome.Failure -> {
+                    println("Falha na leitura estruturada: ${snapshotResult.reason} — ${snapshotResult.message}")
                 }
             }
         }

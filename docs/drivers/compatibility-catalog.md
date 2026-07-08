@@ -327,6 +327,155 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
 
 ## Changelog
 
+- **2026-07-07 (ADR 0001 — modelo do `tplink-stok-luci` passa a carregar SSID/MAC brutos)** —
+  `docs/architecture/adr/0001-fronteira-sanitizacao-telemetria.md` (Rafael) decidiu que
+  sanitização de dado sensível (hash de SSID, mascaramento de MAC) não é responsabilidade do
+  parser/modelo do driver — é responsabilidade exclusiva de um futuro Telemetry Collector, aplicada
+  só na fronteira de exportação. `TpLinkStokLuciWifiRadio.ssidHash` virou `ssid: String?` (SSID
+  real, sem hash); `TpLinkStokLuciLanStatus.macAddressMasked` e
+  `TpLinkStokLuciConnectedClient.macAddressMasked` viraram `macAddress: String?` (MAC completo, sem
+  mascaramento). A entrada de changelog anterior (abaixo) que descrevia essa sanitização como regra
+  da spec §8.9 aplicada "já na origem" reflete o entendimento anterior, corrigido por este ADR — a
+  proibição de coleta de senha do Wi-Fi (`*_psk_key`) não muda, continua nunca lida. Não altera
+  `stage` (`READ_ONLY_ALPHA` permanece).
+
+- **2026-07-07 (parser estruturado de capabilities do `tplink-stok-luci`, manifesto
+  `catalog-2026.07.20.json`)** — `TpLinkStokLuciDriverFamily` (profile `tplink_archer_c6_stok_v1`)
+  ganhou `TpLinkStokLuciStatusParser`, mapeando o corpo já decifrado de `admin/status?form=all`
+  (validado ao vivo em rodada anterior, ver evidência acima) para o vocabulário de capabilities do
+  NetHAL:
+  - `READ_WIFI_STATUS` ← `wireless_2g_ssid`/`wireless_5g_ssid`/`wireless_2g_channel` (rádios
+    principais) e `guest_2g_ssid`/`guest_5g_ssid` (redes de convidados, modeladas como rádios
+    adicionais com `guestNetwork=true` — não existe capability própria para rede de convidados no
+    vocabulário atual, sinalizado como possível gap a discutir com Rafael).
+  - `READ_LAN_STATUS` ← `lan_macaddr` (mascarado) + `lan_ipv4_ipaddr`.
+  - `READ_WAN_STATUS` ← `wan_ipv4_ipaddr`.
+  - `READ_CONNECTED_CLIENTS` ← `access_devices_wired[]` (`macaddr` mascarado, `ipaddr`, `hostname`).
+
+  **Sanitização (spec §8.9), aplicada já na origem do parsing:** SSID nunca fica em texto puro —
+  vira hash SHA-256 (`ssidHash`); MAC sempre mascarado (3 últimos octetos); `wireless_*_psk_key`/
+  `guest_*_psk_key` (a senha do Wi-Fi) **nunca são lidos para nenhum campo** do modelo resultante —
+  não existe campo para isso em `TpLinkStokLuciWifiRadio` de propósito. WAN/LAN IP permanecem em
+  texto puro (não estão na lista de campos proibidos/mascarados da spec §8.9 — só "IP público
+  completo" da telemetria está listado, e o valor de diagnóstico de ver o próprio IP é central para
+  o NetHAL Lab).
+
+  **Campos do payload sem capability correspondente no vocabulário atual:** nenhum — todos os
+  campos citados na tarefa (`wireless_2g_ssid`, `wireless_5g_ssid`, `wireless_2g_channel`,
+  `wireless_2g_psk_key`, `lan_macaddr`, `lan_ipv4_ipaddr`, `wan_ipv4_ipaddr`,
+  `access_devices_wired`, `guest_2g_ssid`, `guest_5g_ssid`) foram mapeados ou deliberadamente
+  excluídos (`psk_key`, nunca — é segredo, não identificador). `READ_DEVICE_INFO`/`READ_FIRMWARE`
+  continuam `UNKNOWN`: nenhum campo de modelo/firmware apareceu no payload observado até aqui.
+
+  **Limite arquitetural que permanece, idêntico ao de `tplink-legacy-cgi-driver`/
+  `tplink-gdpr-cgi-driver`/`tplink-xdr-ds-driver`:** `DriverFamily.readCapability(id)` (a
+  implementação da interface pública, sem parâmetro de credencial) continua retornando
+  `CapabilityReadResult.Unavailable` para todo `CapabilityId` — não existe Capability Engine
+  gerenciando sessão ainda (`docs/architecture/hal-layering-model.md` §8 passo 5), então o dado
+  estruturado real só é alcançável hoje via o novo método `readSnapshot(username, password)`,
+  mesmo padrão de `login()`/`readStatusRaw()` já existentes. `readCapability(id)` ganhou
+  `SUPPORTED_CAPABILITIES` (mesmo padrão introduzido antes por `TpLinkLegacyCgiDriverFamily`) para
+  distinguir "esta Driver Family nunca vai cobrir `$id`" de "cobre, mas exige sessão que esta
+  assinatura não recebe".
+
+  **Estágio do profile:** permanece `READ_ONLY_ALPHA` — não sobe para `READ_ONLY_BETA` nesta
+  rodada porque essa transição exige sign-off explícito de telemetria da Marisa
+  (`/ciclo-vida-driver`), ainda não feito para as capabilities novas. `capabilities[]` do profile
+  passou de `UNKNOWN` para `EXPERIMENTAL` nas quatro capabilities cobertas pelo parser
+  (`READ_WIFI_STATUS`, `READ_LAN_STATUS` — nova, antes ausente do array —, `READ_WAN_STATUS`,
+  `READ_CONNECTED_CLIENTS`), nunca `AVAILABLE`: o mapeamento de nome de campo usado no parser não
+  foi recapturado/reconfirmado byte a byte nesta rodada, só herdado de nomes de campo relatados de
+  uma sessão de teste manual anterior (console do `gradlew :core:tplinkC6StokManualCheck`, não
+  persistido em arquivo). `confidenceScoreOverall` subiu de 0.70 para 0.75 (componente "capability
+  sanity check" de 0.10 para 0.15) pelo mesmo motivo.
+
+  **Testes novos:** `TpLinkStokLuciStatusParserTest` (puro, sem rede — mapeamento de campos,
+  sanitização de SSID/MAC, ausência total de `psk_key` no modelo resultante, JSON malformado/campos
+  ausentes nunca lançam) e extensões em `TpLinkStokLuciDriverFamilyTest`
+  (`SUPPORTED_CAPABILITIES`, `readSnapshot` ponta a ponta contra o fake de transporte,
+  distinção de motivo em `readCapability`). `ManualCheckRunner.runTplinkC6Stok` passou a chamar
+  `readSnapshot` também, imprimindo o resultado estruturado e sanitizado ao lado do corpo bruto já
+  impresso antes.
+
+- **2026-07-07 (correção de consistência do Archer C6 físico no runtime atual)** — O texto
+  histórico abaixo preserva corretamente cada hipótese/refutação por rodada, mas ficou um descompasso
+  entre changelog, catálogo embarcado e evidência viva do profile `tplink_archer_c6_stok_v1`. A
+  evidência consolidada em `docs/drivers/live-evidence/tplink-archer-c6-stok-v1.json` já registra
+  que a implementação atual fez **login real bem-sucedido** e **leitura autenticada real de
+  `admin/status?form=all`** contra o hardware do Luiz em 2026-07-07. Pelo critério deste próprio
+  documento (`DISCOVERY_ONLY -> READ_ONLY_ALPHA` exige ao menos uma leitura autenticada real),
+  o profile não podia continuar descrito como `DISCOVERY_ONLY` por falta de teste. O ajuste desta
+  rodada é de consistência, não de descoberta nova: o catálogo atual passa a refletir o estado real
+  já comprovado da Driver Family `tplink-stok-luci-driver`:
+  `READ_ONLY_ALPHA` para login + `readStatusRaw`, ainda **sem** mapeamento estruturado de
+  capabilities nem cobertura completa de navegação/coleta.
+
+- **2026-07-07 (quarta rodada, chave/IV AES corrigida para string decimal de 16 dígitos —
+  evidência via captura byte a byte externa, manifesto `catalog-2026.07.19.json`)** — A terceira
+  rodada (manifesto `catalog-2026.07.18.json`) corrigiu as duas chaves RSA distintas
+  (`form=keys`/`form=auth`), mas o teste real seguinte (`gradlew :core:tplinkC6StokManualCheck`)
+  **ainda falhou** com `INVALID_CREDENTIALS`/HTTP 403. Nesta rodada, uma ferramenta externa (Codex,
+  outro agente de IA, **não Claude Code**) capturou o texto puro exato do campo `sign` antes de
+  cifrar, durante um login real bem-sucedido pelo navegador contra a mesma unidade física/firmware
+  (Archer C6 v2.0, `1.1.10 Build 20230830 rel.69433(5553)`):
+
+  ```
+  k=5945270769887026&i=3257785177414969&h=f6fdffe48c908deb0f4c3bd36c032e72&s=855135262
+  ```
+
+  (84 caracteres — a senha real usada no login nunca aparece em claro nesta captura, só via hash
+  MD5; não foi compartilhada com este agente e não deveria ser.)
+
+  Essa captura refuta a suposição presente desde a primeira rodada de que a chave/IV AES eram bytes
+  binários aleatórios reais (`SecureRandom.nextBytes`) hex-encodados para virar `k=`/`i=`. O valor
+  real: `k=5945270769887026` e `i=3257785177414969` são strings de **exatamente 16 caracteres, só
+  dígitos decimais `0-9`** (nunca hex, que teria `a-f` misturado). Isso confirma que este firmware
+  usa a variante **`EncryptionWrapperMR`** da lib de referência `tplinkrouterc6u` — distinta da
+  `EncryptionWrapper` genérica que orientou as três rodadas anteriores: a chave/IV AES-128 são
+  strings decimais de 16 caracteres usadas **diretamente como os 16 bytes ASCII/UTF-8** da chave e
+  do IV, nunca decodificadas de hex, nunca bytes binários aleatórios convertidos para hex depois.
+
+  `s=855135262` do exemplo capturado confirma matematicamente `seq (855134878) + tamanho do
+  ciphertext AES em bytes (384) = 855135262` — a fórmula já implementada em
+  `TpLinkStokLuciCrypto.buildSignPlaintext` estava correta e não precisou mudar. String de 84
+  caracteres cifrada em pedaços de 53 bytes (RSA 512-bit, já implementado certo) → 2 pedaços
+  (53+31) → 2 blocos de 64 bytes = 256 caracteres hex no `sign` final, batendo com o tamanho real já
+  observado em capturas anteriores. `h=f6fdffe48c908deb0f4c3bd36c032e72` (MD5, 32 caracteres hex)
+  não teve seu conteúdo exato confirmado nesta rodada — mantida a hipótese `md5(password)`; é a
+  próxima (e provavelmente última) suspeita se esta correção sozinha não bastar.
+
+  **Código alterado:** `TpLinkStokLuciCrypto` ganhou `AES_KEY_OR_IV_DIGIT_COUNT` (16) e
+  `generateAesKeyOrIvDigits()` (gera uma string de 16 dígitos decimais via `SecureRandom`) —
+  substitui o uso de `generateRandomBytes` + `bytesToHex` para a chave/IV desta plataforma
+  (`generateRandomBytes`/`bytesToHex` continuam existindo como utilitários genéricos, usados agora
+  só pelo fake de teste). `TpLinkStokLuciAuthenticationClient.login` gera duas strings decimais
+  (chave e IV), converte cada uma para bytes via `Charsets.US_ASCII` para a `SecretKeySpec`/
+  `IvParameterSpec` que cifra de fato o campo `data`, e passa as mesmas strings decimais (não hex)
+  para `buildSignPlaintext` compor `k=`/`i=` do `sign` — garantindo que é literalmente a mesma
+  chave/IV nos dois lugares. O hash `h=` continua `md5(password)`, sem alteração, documentado como
+  próxima suspeita.
+
+  Testes atualizados: `TpLinkStokLuciCryptoTest` ganhou `generateAesKeyOrIvDigits produces exactly
+  16 decimal ASCII digits...`, `...round-trips through AES-CBC` (confirma que a string decimal usada
+  como bytes ASCII cifra/decifra corretamente) e `buildSignPlaintext matches the shape of the real
+  sign plaintext captured byte by byte externally` (reproduz a forma exata do `sign` capturado, sem
+  usar a senha real). `TpLinkStokLuciAuthenticationClientTest` ganhou um teste que roda o login
+  completo contra o fake e confirma que a chave/IV extraída do `sign` decifrado é uma string de 16
+  dígitos decimais. `FakeTpLinkStokLuciHttpTransport` foi ajustado para extrair `k=`/`i=` como
+  dígitos decimais (regex `\d+` em vez de `[0-9a-f]+`) e expor `lastCapturedAesKeyDigits`/
+  `lastCapturedAesIvDigits` para asserção nos testes.
+
+  Novo manifesto `catalog-2026.07.19.json` (`previousManifest: catalog-2026.07.18.json`): só o
+  profile `tplink_archer_c6_stok_v1` foi alterado — nova entrada `fingerprintEvidence[]` tipo
+  `auth_mechanism` (HIGH, 0.75) documenta a captura byte a byte externa; novo item em
+  `knownFirmwareBugs[]` documenta a lição (segundo erro independente pode produzir o mesmo sintoma
+  de falha que o primeiro); `stageReason`/`physicalTestAccessNote` atualizados;
+  `confidenceScoreOverall` sobe de `0.5` para `0.55`. `stage` permanece `DISCOVERY_ONLY` até o
+  próximo teste real (`gradlew :core:tplinkC6StokManualCheck`) confirmar login bem-sucedido com a
+  chave/IV decimal corrigida — não promover sem esse teste (`/ciclo-vida-driver`).
+  `loadEmbeddedCatalogResource()` (default de `DriverRegistry.kt`) atualizado para apontar para o
+  novo manifesto.
+
 - **2026-07-07 (terceira rodada, evidência DEFINITIVA via Playwright — reposição de `form=keys`,
   manifesto `catalog-2026.07.18.json`)** — A segunda rodada de correção (manifesto
   `catalog-2026.07.17.json`) tinha concluído, por engano, que o handshake do

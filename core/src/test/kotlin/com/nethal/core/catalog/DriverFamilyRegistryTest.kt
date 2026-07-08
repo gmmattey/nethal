@@ -27,7 +27,12 @@ private class NoOpHttpTransport : HttpTransport {
     override fun get(url: String, extraHeaders: Map<String, String>): HttpTransportResponse =
         HttpTransportResponse(statusCode = 200, body = "", headers = emptyMap(), cookies = emptyMap())
 
-    override fun post(url: String, body: String, cookies: Map<String, String>): HttpTransportResponse =
+    override fun post(
+        url: String,
+        body: String,
+        cookies: Map<String, String>,
+        extraHeaders: Map<String, String>,
+    ): HttpTransportResponse =
         HttpTransportResponse(statusCode = 200, body = "", headers = emptyMap(), cookies = emptyMap())
 }
 

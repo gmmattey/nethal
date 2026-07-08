@@ -188,7 +188,8 @@ internal class TpLinkLegacyCgiDriverFamily(
  */
 private class HttpTransportToTplinkAdapter(private val delegate: HttpTransport) : TplinkHttpTransport {
     override fun get(url: String, extraHeaders: Map<String, String>) = delegate.get(url, extraHeaders)
-    override fun post(url: String, body: String, cookies: Map<String, String>) = delegate.post(url, body, cookies)
+    override fun post(url: String, body: String, cookies: Map<String, String>) =
+        delegate.post(url, body, cookies = cookies)
 }
 
 /**

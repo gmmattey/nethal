@@ -267,9 +267,10 @@ internal class TpLinkStokLuciAuthenticationClient(
 
     /**
      * Faz uma chamada de dados autenticada contra `{host}/cgi-bin/luci/;stok=<token>/<path>`,
-     * reenviando o cookie `sysauth` se presente. Cobre só leitura simples (sem o envelope
-     * AES/assinatura completo de chamadas autenticadas, fora de escopo desta entrega) — mantido
-     * inalterado desde a rodada anterior, ainda não validado contra hardware real.
+     * reenviando o cookie `sysauth` se presente e usando o envelope autenticado real desta
+     * plataforma (`sign` + `data`, com reuso da chave/IV AES e da chave RSA de assinatura da
+     * sessão). Hoje cobre só leitura simples do endpoint de status validado ao vivo; o parsing
+     * estruturado dos campos continua fora de escopo desta entrega.
      */
     @Throws(IOException::class)
     fun fetchAuthenticated(path: String, query: String): String {

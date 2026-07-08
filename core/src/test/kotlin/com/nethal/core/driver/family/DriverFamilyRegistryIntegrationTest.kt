@@ -41,7 +41,12 @@ class DriverFamilyRegistryIntegrationTest {
         override fun get(url: String, extraHeaders: Map<String, String>): HttpTransportResponse =
             HttpTransportResponse(404, "", emptyMap(), emptyMap())
 
-        override fun post(url: String, body: String, cookies: Map<String, String>): HttpTransportResponse {
+        override fun post(
+            url: String,
+            body: String,
+            cookies: Map<String, String>,
+            extraHeaders: Map<String, String>,
+        ): HttpTransportResponse {
             postCallCount++
             if (cookies["Authorization"] != expectedAuthorizationCookie) {
                 return HttpTransportResponse(401, "", emptyMap(), emptyMap())
@@ -132,7 +137,12 @@ class DriverFamilyRegistryIntegrationTest {
             "192.168.0.1",
             object : HttpTransport {
                 override fun get(url: String, extraHeaders: Map<String, String>) = HttpTransportResponse(404, "", emptyMap(), emptyMap())
-                override fun post(url: String, body: String, cookies: Map<String, String>) = HttpTransportResponse(200, "[error]0", emptyMap(), emptyMap())
+                override fun post(
+                    url: String,
+                    body: String,
+                    cookies: Map<String, String>,
+                    extraHeaders: Map<String, String>,
+                ) = HttpTransportResponse(200, "[error]0", emptyMap(), emptyMap())
             },
         )
 

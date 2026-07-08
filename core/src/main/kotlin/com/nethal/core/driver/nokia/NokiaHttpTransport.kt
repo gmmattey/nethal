@@ -56,5 +56,5 @@ internal class DefaultNokiaHttpTransport(
         delegate.get(url, extraHeaders)
 
     override fun post(url: String, body: String, initCookies: Map<String, String>): NokiaHttpResponse =
-        delegate.post(url, body, initCookies)
+        delegate.post(url, body, cookies = initCookies)
 }

@@ -8,8 +8,8 @@ import org.junit.Test
 
 /**
  * Testes de [TpLinkStokLuciDriverFamily] — orquestração (retry, guarda RFC 1918, classificação de
- * falha), com fake de transporte. Não confirmam o protocolo contra hardware real (ver KDoc da
- * classe e do profile `tplink_archer_c6_stok_v1` no catálogo, `DISCOVERY_ONLY`).
+ * falha), com fake de transporte. Não substituem a validação ao vivo já registrada para login +
+ * `readStatusRaw`; cobrem só a lógica determinística desta classe.
  */
 class TpLinkStokLuciDriverFamilyTest {
 
@@ -106,5 +106,54 @@ class TpLinkStokLuciDriverFamilyTest {
         val result = driver.readCapability(com.nethal.core.model.CapabilityId.READ_DEVICE_INFO)
 
         assertTrue(result is com.nethal.core.catalog.CapabilityReadResult.Unavailable)
+    }
+
+    @Test
+    fun `readCapability distinguishes unsupported capability from supported-but-sessionless in the reason`() = runTest {
+        val transport = FakeTpLinkStokLuciHttpTransport()
+        val driver = TpLinkStokLuciDriverFamily("192.168.0.1", realProfileConfig(), transport)
+
+        val unsupported = driver.readCapability(com.nethal.core.model.CapabilityId.READ_DEVICE_INFO)
+            as com.nethal.core.catalog.CapabilityReadResult.Unavailable
+        assertTrue(unsupported.reason.contains("não implementa parsing"))
+
+        val supportedButSessionless = driver.readCapability(com.nethal.core.model.CapabilityId.READ_WIFI_STATUS)
+            as com.nethal.core.catalog.CapabilityReadResult.Unavailable
+        assertTrue(supportedButSessionless.reason.contains("readSnapshot"))
+    }
+
+    @Test
+    fun `SUPPORTED_CAPABILITIES covers only capabilities with real structured parsing`() {
+        assertEquals(
+            setOf(
+                com.nethal.core.model.CapabilityId.READ_WIFI_STATUS,
+                com.nethal.core.model.CapabilityId.READ_LAN_STATUS,
+                com.nethal.core.model.CapabilityId.READ_WAN_STATUS,
+                com.nethal.core.model.CapabilityId.READ_CONNECTED_CLIENTS,
+            ),
+            TpLinkStokLuciDriverFamily.SUPPORTED_CAPABILITIES,
+        )
+    }
+
+    @Test
+    fun `readSnapshot parses the raw status body into structured capability data`() = runTest {
+        val transport = FakeTpLinkStokLuciHttpTransport(
+            simulateRealServerStok = "tokABC",
+            statusResponse = com.nethal.core.protocol.http.HttpTransportResponse(
+                200,
+                """{"success":true,"data":{"wireless_2g_ssid":"CasaLuiz_2G","wan_ipv4_ipaddr":"201.17.45.90"}}""",
+                emptyMap(),
+                emptyMap(),
+            ),
+        )
+        val driver = TpLinkStokLuciDriverFamily("192.168.0.1", realProfileConfig(), transport, backoffMillis = { 0L })
+
+        val result = driver.readSnapshot("admin", "secret")
+
+        assertTrue(result is TpLinkStokLuciSnapshotOutcome.Success)
+        val snapshot = (result as TpLinkStokLuciSnapshotOutcome.Success).snapshot
+        assertEquals(1, snapshot.wifi.size)
+        assertEquals("CasaLuiz_2G", snapshot.wifi.first().ssid)
+        assertEquals("201.17.45.90", snapshot.wan?.ipv4Address)
     }
 }

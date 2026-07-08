@@ -35,6 +35,10 @@ Sources:
 
 Mandatory layer before any write action.
 
+## Telemetry Collector
+
+Ainda não implementado. Quando existir, é o único ponto autorizado a aplicar as regras de mascaramento/hash da spec §8.9 (SSID, MAC, IP público) — na fronteira de exportação, quando um dado sai do dispositivo. Modelos internos de Driver Family (ex.: `TpLinkStokLuciSnapshot`) carregam dado bruto para uso local do NetHAL Lab; sanitização não é responsabilidade do parser de um driver. Ver [`adr/0001-fronteira-sanitizacao-telemetria.md`](adr/0001-fronteira-sanitizacao-telemetria.md).
+
 ## Driver Registry, Driver Family e Compatibility Catalog
 
 A partir de 2026-07-06, o NetHAL segue o modelo de camadas congelado em

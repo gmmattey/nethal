@@ -33,22 +33,34 @@ internal sealed interface TpLinkStokLuciStatusOutcome {
     data class Failure(val reason: TpLinkStokLuciFailureReason, val message: String) : TpLinkStokLuciStatusOutcome
 }
 
+internal sealed interface TpLinkStokLuciSnapshotOutcome {
+    data class Success(val snapshot: TpLinkStokLuciSnapshot) : TpLinkStokLuciSnapshotOutcome
+    data class Failure(val reason: TpLinkStokLuciFailureReason, val message: String) : TpLinkStokLuciSnapshotOutcome
+}
+
 /**
  * Driver Family da plataforma `tplink-stok-luci` (`platformId`/`driverFamilyId` do catálogo —
  * profile `tplink_archer_c6_stok_v1`, ver `docs/architecture/hal-layering-model.md` §9.1).
  *
- * Implementa só o login (envelope `sign`/`data`, ver [TpLinkStokLuciAuthenticationClient] para o
- * protocolo real confirmado por evidência ao vivo) mais uma leitura autenticada simples de status
- * geral — a etapa de chamadas autenticadas estruturadas por capability (necessária para a maioria
- * dos endpoints de leitura) fica fora de escopo desta entrega, documentada como próximo passo.
+ * Implementa o login (envelope `sign`/`data`, ver [TpLinkStokLuciAuthenticationClient] para o
+ * protocolo real confirmado por evidência ao vivo), uma leitura autenticada bruta de status geral
+ * ([readStatusRaw]) e, desde esta rodada, o parsing estruturado desse payload para o vocabulário de
+ * capabilities do NetHAL ([readSnapshot], via [TpLinkStokLuciStatusParser]) — cobre
+ * `READ_WIFI_STATUS`, `READ_LAN_STATUS`, `READ_WAN_STATUS` e `READ_CONNECTED_CLIENTS`
+ * ([SUPPORTED_CAPABILITIES]). `READ_DEVICE_INFO`/`READ_FIRMWARE` continuam fora de escopo: o
+ * payload de `admin/status?form=all` capturado até aqui não trouxe evidência de campo de
+ * modelo/firmware.
  *
- * **Primeiro teste real contra o hardware do Luiz deu `INVALID_CREDENTIALS` (HTTP 403)** com a
- * implementação anterior (baseada só em leitura da lib Python `tplinkrouterc6u`, nunca testada).
- * Esta versão corrige o protocolo a partir de evidência ao vivo (interceptação de `XMLHttpRequest`
- * em login real bem-sucedido + leitura estrutural dos scripts JS reais do equipamento), mas ainda
- * carrega suposições não confirmadas byte a byte (ver KDoc de [TpLinkStokLuciCrypto]) — profile
- * permanece `DISCOVERY_ONLY` até o próximo teste real confirmar login bem-sucedido. Ver
- * `ManualCheckRunner` para o comando de teste manual.
+ * O ciclo de correções desta Driver Family passou por várias rodadas de `INVALID_CREDENTIALS`
+ * (HTTP 403) até convergir com a captura real do hardware do Luiz (Archer C6 v2.0, firmware
+ * `1.1.10 Build 20230830 rel.69433(5553)`). O estado atual já foi validado ao vivo para:
+ * login bem-sucedido + leitura autenticada bruta de `admin/status?form=all`. O que AINDA não
+ * existe é o gerenciamento de sessão do Capability Engine — [readCapability] (a implementação de
+ * [DriverFamily], sem parâmetro de credencial) continua honestamente indisponível nesta etapa,
+ * mesmo com o parser estruturado já existindo; quem precisa do dado real hoje chama [readSnapshot]
+ * diretamente, mesmo padrão de [login]/[readStatusRaw]. Ver `ManualCheckRunner` para o comando de
+ * teste manual e `docs/drivers/live-evidence/tplink-archer-c6-stok-v1.json` para a evidência de
+ * hardware.
  *
  * Guarda de SSRF obrigatória (RFC 1918), mesma classe de risco de toda Driver Family do NetHAL —
  * falha rápido, sem tentar login, quando o host não é IP privado.
@@ -102,11 +114,10 @@ internal class TpLinkStokLuciDriverFamily(
     }
 
     /**
-     * Login seguido de uma única leitura autenticada simples (`config.statusReadPath`), sem
-     * envelope AES/assinatura — cobre só o que a pesquisa de terceiros documenta como aceito sem
-     * esse envelope para alguns `form`s de leitura. Devolve o corpo bruto (JSON), sem parsing
-     * estruturado: nenhum modelo de dados de status foi definido nesta rodada porque o formato de
-     * resposta real deste endpoint nunca foi observado contra hardware de verdade.
+     * Login seguido de uma única leitura autenticada real de `config.statusReadPath`, usando o
+     * mesmo envelope AES + `sign` confirmado no hardware. Devolve o corpo bruto já decifrado
+     * (JSON), sem parsing estruturado: a coleta ponta a ponta deste endpoint já foi validada contra
+     * o equipamento real, mas ainda não existe mapeamento de campos para capabilities.
      */
     suspend fun readStatusRaw(username: String, password: String): TpLinkStokLuciStatusOutcome = withContext(Dispatchers.IO) {
         val outcome = executeWithRetry(
@@ -135,17 +146,43 @@ internal class TpLinkStokLuciDriverFamily(
     }
 
     /**
+     * [readStatusRaw] seguido do parsing estruturado ([TpLinkStokLuciStatusParser.parseSnapshot])
+     * do corpo bruto de `admin/status?form=all` para o vocabulário de capabilities do NetHAL —
+     * cobre [SUPPORTED_CAPABILITIES]. Mesma orquestração (login novo a cada chamada, sem sessão
+     * persistida) e mesmo motivo: sem Capability Engine gerenciando sessão ainda, este é o ponto de
+     * entrada real usado por `ManualCheckRunner`/testes até essa peça existir.
+     */
+    suspend fun readSnapshot(username: String, password: String): TpLinkStokLuciSnapshotOutcome =
+        when (val outcome = readStatusRaw(username, password)) {
+            is TpLinkStokLuciStatusOutcome.Success ->
+                TpLinkStokLuciSnapshotOutcome.Success(TpLinkStokLuciStatusParser.parseSnapshot(outcome.rawBody))
+            is TpLinkStokLuciStatusOutcome.Failure ->
+                TpLinkStokLuciSnapshotOutcome.Failure(outcome.reason, outcome.message)
+        }
+
+    /**
      * Implementação de [DriverFamily.readCapability] — mesmo desenho honesto do
-     * `TpLinkLegacyCgiDriverFamily`: sem Capability Engine gerenciando sessão ainda, a única
-     * resposta correta é [CapabilityReadResult.Unavailable]. Quem precisa da leitura real hoje
-     * (`ManualCheckRunner`, testes) chama [login]/[readStatusRaw] diretamente com a credencial da
-     * sessão local.
+     * `TpLinkLegacyCgiDriverFamily` (que já introduziu [SUPPORTED_CAPABILITIES] para distinguir
+     * "esta Driver Family nunca vai suportar $id" de "suporta, mas exige sessão que esta assinatura
+     * não recebe"). O parser estruturado ([TpLinkStokLuciStatusParser]) já existe e cobre
+     * [SUPPORTED_CAPABILITIES] de verdade — só não há, nesta rodada, Capability Engine gerenciando
+     * sessão para alimentar esta chamada sem parâmetro de credencial (mesma lacuna documentada em
+     * `docs/architecture/hal-layering-model.md` §8 passo 5). Quem precisa do dado real hoje
+     * (`ManualCheckRunner`, testes) chama [readSnapshot] diretamente com a credencial da sessão
+     * local.
      */
     override suspend fun readCapability(id: CapabilityId): CapabilityReadResult {
+        if (id !in SUPPORTED_CAPABILITIES) {
+            return CapabilityReadResult.Unavailable(
+                reason = "TpLinkStokLuciDriverFamily não implementa parsing para $id nesta rodada.",
+            )
+        }
         return CapabilityReadResult.Unavailable(
-            reason = "TpLinkStokLuciDriverFamily ainda não implementa leitura estruturada por capability " +
-                "(protocolo nunca testado contra hardware real, profile em DISCOVERY_ONLY). Use login()/" +
-                "readStatusRaw() diretamente com a credencial da sessão local.",
+            reason = "Leitura de $id já tem parser estruturado (TpLinkStokLuciStatusParser, a partir de " +
+                "admin/status?form=all), mas exige uma sessão autenticada (usuário/senha informados pelo " +
+                "usuário na sessão local) que esta assinatura de readCapability(id) não recebe — ainda não " +
+                "há Capability Engine gerenciando essa sessão. Use readSnapshot(username, password) " +
+                "diretamente com a credencial da sessão local.",
         )
     }
 
@@ -154,6 +191,20 @@ internal class TpLinkStokLuciDriverFamily(
         NetworkFailureReason.TIMEOUT -> TpLinkStokLuciFailureReason.TIMEOUT
         NetworkFailureReason.UNEXPECTED_RESPONSE -> TpLinkStokLuciFailureReason.UNEXPECTED_RESPONSE
         NetworkFailureReason.COMMUNICATION_ERROR -> TpLinkStokLuciFailureReason.COMMUNICATION_ERROR
+    }
+
+    companion object {
+        /**
+         * Capabilities com parser estruturado real a partir de `admin/status?form=all`
+         * ([TpLinkStokLuciStatusParser]) — `READ_DEVICE_INFO`/`READ_FIRMWARE` ficam de fora porque
+         * nenhum campo de modelo/firmware foi confirmado nesse payload até aqui.
+         */
+        val SUPPORTED_CAPABILITIES: Set<CapabilityId> = setOf(
+            CapabilityId.READ_WIFI_STATUS,
+            CapabilityId.READ_LAN_STATUS,
+            CapabilityId.READ_WAN_STATUS,
+            CapabilityId.READ_CONNECTED_CLIENTS,
+        )
     }
 }
 

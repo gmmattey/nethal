@@ -455,6 +455,8 @@ Todas as ações acima, quando afetam o rádio/SSID que o próprio celular usa p
 
 Coleta dados para evolução de compatibilidade.
 
+> Esta seção define a fronteira de exportação (o que pode sair do dispositivo), não o modelo de dados interno de um driver. Um driver pode e deve carregar SSID, MAC, IP e hostname em claro em sua própria estrutura de dados, para uso local do dono do equipamento (NetHAL Lab) — mascaramento/hash só se aplica quando/se este Telemetry Collector existir e algum dado cruzar a fronteira do dispositivo. Ver `docs/architecture/adr/0001-fronteira-sanitizacao-telemetria.md`.
+
 Permitido coletar:
 
 - Fabricante.

@@ -57,3 +57,56 @@ internal data class TpLinkStokLuciAuthKeys(
     val seq: Long,
     val key: TpLinkStokLuciRsaKey,
 )
+
+/**
+ * Modelos estruturados do payload de status desta plataforma (`admin/status?form=all`), mapeados
+ * pelo vocabulário de capabilities do NetHAL a partir do JSON bruto — ver [TpLinkStokLuciStatusParser]
+ * para as regras exatas de extração.
+ *
+ * Por decisão de `docs/architecture/adr/0001-fronteira-sanitizacao-telemetria.md`, este modelo
+ * carrega dado bruto (SSID em texto puro, MAC completo) — sanitização de telemetria (hash de SSID,
+ * mascaramento de MAC) é responsabilidade exclusiva de um futuro Telemetry Collector, aplicada só
+ * na fronteira de exportação, não do modelo interno do driver. `readSnapshot()` hoje alimenta
+ * apenas uso local (`ManualCheckRunner` e futura tela do NetHAL Lab), sem upload para nuvem em
+ * lugar nenhum do código.
+ *
+ * A única regra que permanece é de coleta, não de sanitização: a senha do Wi-Fi (`*_psk_key`)
+ * nunca é lida para nenhum campo deste modelo — não existe campo para isso em
+ * [TpLinkStokLuciWifiRadio] de propósito.
+ */
+internal enum class TpLinkStokLuciWifiBand { GHZ_2_4, GHZ_5, UNKNOWN }
+
+/** Um rádio Wi-Fi (rede principal ou de convidados) — cobre `READ_WIFI_STATUS`. */
+internal data class TpLinkStokLuciWifiRadio(
+    val id: String,
+    val band: TpLinkStokLuciWifiBand,
+    val guestNetwork: Boolean,
+    val ssid: String?,
+    val channel: Int?,
+)
+
+/** Status de LAN (`lan_macaddr`/`lan_ipv4_ipaddr`) — cobre `READ_LAN_STATUS`. */
+internal data class TpLinkStokLuciLanStatus(
+    val macAddress: String?,
+    val ipv4Address: String?,
+)
+
+/** Status de WAN (`wan_ipv4_ipaddr`) — cobre `READ_WAN_STATUS`. */
+internal data class TpLinkStokLuciWanStatus(
+    val ipv4Address: String?,
+)
+
+/** Um dispositivo cabeado de `access_devices_wired` — cobre `READ_CONNECTED_CLIENTS`. */
+internal data class TpLinkStokLuciConnectedClient(
+    val hostname: String?,
+    val ipAddress: String?,
+    val macAddress: String?,
+)
+
+/** Snapshot estruturado agregando todas as capabilities cobertas pelo parser desta plataforma. */
+internal data class TpLinkStokLuciSnapshot(
+    val wifi: List<TpLinkStokLuciWifiRadio>,
+    val lan: TpLinkStokLuciLanStatus?,
+    val wan: TpLinkStokLuciWanStatus?,
+    val connectedClients: List<TpLinkStokLuciConnectedClient>,
+)

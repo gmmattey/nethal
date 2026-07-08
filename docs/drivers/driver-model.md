@@ -6,6 +6,10 @@ NETHAL is capability-first.
 
 Applications should use capabilities instead of vendor-specific conditionals.
 
+## Sanitização de dado sensível não é responsabilidade do driver
+
+Modelos de dado de uma Driver Family (SSID, MAC, IP, hostname de clientes conectados etc.) carregam valor bruto, real — nunca hash ou máscara aplicada pelo próprio parser do driver. Mascaramento/hash (spec §8.9) é regra da fronteira de exportação do Telemetry Collector, aplicada só se e quando um dado sai do dispositivo — nunca na representação interna usada pelo NetHAL Lab para o usuário ver a própria rede. Exceção dura, não sanitização: senha (do roteador ou do Wi-Fi) nunca é lida por nenhum driver, em nenhuma circunstância — isso não é sanitização, é proibição de coleta. Decisão e motivação completas em `docs/architecture/adr/0001-fronteira-sanitizacao-telemetria.md`.
+
 ## Capability states
 
 ```text

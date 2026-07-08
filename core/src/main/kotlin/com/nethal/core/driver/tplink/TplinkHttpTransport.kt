@@ -56,5 +56,5 @@ internal class DefaultTplinkHttpTransport(
         delegate.get(url, extraHeaders)
 
     override fun post(url: String, body: String, cookies: Map<String, String>): TplinkHttpResponse =
-        delegate.post(url, body, cookies)
+        delegate.post(url, body, cookies = cookies)
 }
