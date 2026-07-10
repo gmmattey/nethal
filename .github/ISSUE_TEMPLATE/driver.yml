@@ -1,0 +1,91 @@
+name: "Driver request"
+description: "Pedido de compatibilidade com um equipamento de rede (fabricante/modelo/firmware)"
+title: "Task - Driver: "
+labels: ["type:task", "driver-request"]
+body:
+  - type: markdown
+    attributes:
+      value: "Preencha o máximo que puder. Remova qualquer dado sensível (senha, SSID em claro, MAC/IP completos) de prints ou logs antes de anexar."
+
+  - type: input
+    id: fabricante
+    attributes:
+      label: "Fabricante"
+      placeholder: "TP-Link"
+    validations:
+      required: true
+
+  - type: input
+    id: modelo
+    attributes:
+      label: "Modelo"
+      placeholder: "Archer C6"
+    validations:
+      required: true
+
+  - type: input
+    id: firmware
+    attributes:
+      label: "Firmware"
+      placeholder: "1.3.6 Build 20210401"
+    validations:
+      required: true
+
+  - type: input
+    id: pais_isp
+    attributes:
+      label: "País / provedor (ISP), se aplicável"
+      placeholder: "Brasil — Vivo Fibra"
+
+  - type: dropdown
+    id: protocolo
+    attributes:
+      label: "Protocolo (se conhecido)"
+      options: ["Desconhecido", "TR-064", "UPnP/IGD (SSDP)", "LuCI (OpenWrt)", "ubus/rpcd (OpenWrt)", "MikroTik API", "MikroTik REST", "ASUSWRT", "SNMP", "HNAP (só fingerprint)", "Outro"]
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contexto_acesso
+    attributes:
+      label: "Contexto de acesso"
+      options:
+        - label: "Sou dono ou administro este equipamento"
+        - label: "Consigo acessar a página de administração local"
+        - label: "Estou conectado à mesma rede local"
+
+  - type: checkboxes
+    id: capability_alvo
+    attributes:
+      label: "Capability alvo — o que deveria funcionar?"
+      options:
+        - label: "READ_DEVICE_INFO — ler informações do equipamento"
+        - label: "READ_WAN_STATUS — ler status da WAN"
+        - label: "READ_WIFI_STATUS — ler status do Wi-Fi"
+        - label: "READ_CLIENTS — ler dispositivos conectados"
+        - label: "SET_WIFI_CHANNEL — trocar canal do Wi-Fi (escrita)"
+        - label: "REBOOT_DEVICE — reiniciar equipamento (escrita)"
+        - label: "Outra (descrever abaixo)"
+
+  - type: dropdown
+    id: estagio_inicial
+    attributes:
+      label: "Estágio inicial de driver"
+      description: "Todo driver nasce lendo. Escrita exige teste real e sign-off de segurança."
+      options: ["DRAFT", "DISCOVERY_ONLY", "READ_ONLY_ALPHA"]
+    validations:
+      required: true
+
+  - type: textarea
+    id: notas
+    attributes:
+      label: "Notas"
+      description: "Endpoints conhecidos, comportamento observado, bugs de firmware. Anexe prints só depois de remover dado sensível."
+
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: "Prioridade"
+      options: ["P0 — Urgente", "P1 — Importante", "P2 — Backlog"]
+    validations:
+      required: true

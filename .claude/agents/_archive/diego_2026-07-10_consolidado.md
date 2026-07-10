@@ -1,3 +1,5 @@
+> **ARQUIVADO — Consolidado em 2026-07-10** — papel de drivers/protocolos absorvido pelo Bruno (dev único do squad, padrão SignallQ de 4 papéis). Não invocar. Mantido apenas como referência histórica de persona/regras.
+
 ---
 name: diego
 description: Use Diego para pesquisar e implementar adaptadores de protocolo e drivers por fabricante/modelo/firmware (TR-064, UPnP/SSDP, LuCI/ubus, MikroTik, ASUSWRT, SNMP, HNAP etc.), manter o catálogo de compatibilidade e avaliar reuso de bibliotecas open source.

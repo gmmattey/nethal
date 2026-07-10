@@ -1,6 +1,6 @@
 ---
 name: seguranca-nethal
-description: Bloqueios obrigatórios do Safety Guard, regras de autenticação e checklist de sanitização de telemetria. Consultar antes de implementar qualquer ação de escrita, fluxo de login/credencial, ou campo novo de telemetria.
+description: Referência de ações de escrita que exigem confirmação do usuário, regras de autenticação e checklist de sanitização de telemetria. Consulta técnica antes de implementar qualquer ação de escrita, fluxo de login/credencial, ou campo novo de telemetria — não é gate de aprovação.
 ---
 
 Consulte as regras de segurança relevantes para a tarefa abaixo:
@@ -22,7 +22,7 @@ Fonte completa: `SECURITY.md`, `CONTRIBUTING.md`, `docs/product/specification.md
 - Habilitar acesso remoto fora da LAN sem consentimento.
 - Ação destrutiva ou silenciosa (sem aviso e sem confirmação).
 
-## Safety Guard — bloqueios obrigatórios antes de ação de escrita
+## Ações de escrita que exigem confirmação explícita do usuário
 
 - Trocar senha Wi-Fi sem confirmação explícita.
 - Trocar SSID sem confirmação.
@@ -72,13 +72,13 @@ IP público: 201.17.45.90 → 201.17.xxx.xxx
 ## Checklist antes de aprovar merge com impacto de segurança
 
 - [ ] Nenhuma credencial é persistida em disco, `SharedPreferences`, log ou crash report
-- [ ] Toda ação de escrita nova está na lista de "menor risco" ou tem revisão explícita de Marisa
-- [ ] Toda ação da lista de bloqueios obrigatórios exige confirmação explícita do usuário — nunca é automática
+- [ ] Toda ação de escrita nova tem confirmação explícita do usuário antes de executar
+- [ ] Toda ação da lista de escrita acima exige confirmação explícita do usuário — nunca é automática
 - [ ] Campo de telemetria novo está na lista de permitido e passa pelo mascaramento correspondente
 - [ ] Superfície historicamente perigosa (HNAP, credenciais padrão, Telnet) é tratada só como fingerprint, nunca como automação
 - [ ] Sessão expira ao fechar o módulo
 
 ## Limites
 
-- Esta skill define regra, não implementa — implementação cabe a Bruno/Diego, revisão final cabe a Marisa.
-- Dúvida sobre risco de uma ação nova: tratar como bloqueio até revisão explícita — falha segura sempre vence.
+- Esta skill é referência técnica, não implementa — implementação cabe a Bruno, revisão (parte do QA normal) cabe a Marisa.
+- Dúvida sobre risco de uma ação nova: exigir confirmação do usuário e sinalizar no review — na dúvida, não executar automaticamente.

@@ -36,14 +36,14 @@ Progressão é sempre sequencial. Nenhum driver pula de `DISCOVERY_ONLY` direto 
 - Fallback seguro implementado.
 - Logs suficientes para diagnóstico.
 
-## Gate obrigatório em cada transição
+## Transições entre estágios (guia de maturidade, não gate bloqueante)
 
 - `DRAFT → DISCOVERY_ONLY`: driver identificado, sem ainda ler dado real do equipamento.
-- `DISCOVERY_ONLY → READ_ONLY_ALPHA`: pelo menos um teste real (modelo + firmware) documentado por Diego.
-- `READ_ONLY_ALPHA → READ_ONLY_BETA`: capabilities de leitura declaradas e revisadas por Marisa quanto a telemetria.
-- `READ_ONLY_BETA → WRITE_BETA`: **exige sign-off explícito de Marisa** — toda capability de escrita passou pelo Safety Guard (`/seguranca-nethal`).
-- `WRITE_BETA → STABLE`: critérios objetivos acima cumpridos + aprovação de Rafael.
-- Qualquer estágio `→ BLOCKED`: Marisa pode bloquear a qualquer momento se detectar risco de segurança, independente do estágio atual.
+- `DISCOVERY_ONLY → READ_ONLY_ALPHA`: pelo menos um teste real (modelo + firmware) documentado por Bruno.
+- `READ_ONLY_ALPHA → READ_ONLY_BETA`: capabilities de leitura declaradas; Marisa confere telemetria no review normal.
+- `READ_ONLY_BETA → WRITE_BETA`: toda capability de escrita tem confirmação explícita do usuário e passou pela revisão de QA da Marisa (parte do review, não sign-off bloqueante) — ver `/seguranca-nethal`.
+- `WRITE_BETA → STABLE`: critérios objetivos acima cumpridos + decisão de produto do Rafael.
+- Qualquer estágio `→ BLOCKED`: qualquer um do squad sinaliza risco de segurança a qualquer momento; o Rafael decide bloquear/reverter.
 
 ## Critérios para um driver entrar no SignallQ
 
@@ -58,9 +58,9 @@ Um driver NetHAL só é proposto para o SignallQ quando:
 - Não prejudica a experiência principal do SignallQ.
 - Não promete controle universal.
 
-A decisão final de propor um driver para o SignallQ é do Rafael, após sign-off de segurança da Marisa.
+A decisão final de propor um driver para o SignallQ é do Rafael, com a revisão de QA da Marisa como insumo.
 
 ## Limites
 
-- Esta skill define o gate, não o implementa — quem evidencia teste é Diego, quem aprova segurança é Marisa, quem decide promoção final é Rafael.
+- Esta skill descreve a maturidade de driver — quem evidencia teste é Bruno, quem revisa QA/segurança é Marisa, quem decide promoção é Rafael.
 - Estágio declarado sem evidência documentada (teste real, revisão) não vale — sempre exigir rastro.

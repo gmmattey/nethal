@@ -1,0 +1,51 @@
+name: "Task"
+description: "Trabalho planejado — feature, componente do SDK, tela do Lab, driver ou melhoria"
+title: "Task - "
+labels: ["type:task"]
+body:
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: "Objetivo"
+      description: "O que essa task entrega? Uma frase."
+      placeholder: "Adicionar fingerprint TR-064 ao Protocol Detector para identificar FRITZ!Box."
+    validations:
+      required: true
+
+  - type: textarea
+    id: contexto
+    attributes:
+      label: "Contexto"
+      description: "Por que isso é necessário agora? Qual problema resolve?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: criterios
+    attributes:
+      label: "Critérios de aceite"
+      value: "- [ ] \n- [ ] \n- [ ] "
+    validations:
+      required: true
+
+  - type: textarea
+    id: fora_escopo
+    attributes:
+      label: "Fora de escopo"
+      description: "O que explicitamente NÃO será feito nesta task."
+
+  - type: dropdown
+    id: plataforma
+    attributes:
+      label: "Plataforma"
+      options: ["NetHAL Core (SDK)", "NetHAL Lab (app)", "Driver/Protocolo", "Segurança/Telemetria", "Infraestrutura"]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: "Prioridade"
+      options: ["P0 — Urgente", "P1 — Importante", "P2 — Backlog"]
+    validations:
+      required: true

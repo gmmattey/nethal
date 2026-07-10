@@ -1,0 +1,80 @@
+name: "Bug"
+description: "Comportamento incorreto, crash ou regressão"
+title: "[BUG] "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: "Comportamento atual"
+      description: "O que está acontecendo? Uma frase direta."
+      placeholder: "O discovery não encontra o roteador quando o Wi-Fi está em banda 5 GHz."
+    validations:
+      required: true
+
+  - type: textarea
+    id: esperado
+    attributes:
+      label: "Comportamento esperado"
+      description: "O que deveria acontecer?"
+      placeholder: "O roteador é descoberto e identificado com o driver correto."
+    validations:
+      required: true
+
+  - type: textarea
+    id: passos
+    attributes:
+      label: "Passos para reproduzir"
+      value: "1. \n2. \n3. "
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs / stacktrace"
+      description: "Cole aqui o stack trace, logcat ou mensagem de erro. Remova qualquer dado sensível (senha, SSID em claro, MAC/IP completos)."
+      render: text
+
+  - type: input
+    id: device
+    attributes:
+      label: "Device Android / API level"
+      placeholder: "Samsung Galaxy A33 — Android 13 (API 33)"
+
+  - type: input
+    id: equipamento
+    attributes:
+      label: "Equipamento de rede / firmware"
+      placeholder: "TP-Link Archer C6 — firmware 1.3.6"
+
+  - type: checkboxes
+    id: regressao
+    attributes:
+      label: "Regressão"
+      options:
+        - label: "Funcionava antes e parou de funcionar"
+
+  - type: textarea
+    id: criterios
+    attributes:
+      label: "Critérios de aceite"
+      value: "- [ ] \n- [ ] "
+    validations:
+      required: true
+
+  - type: dropdown
+    id: plataforma
+    attributes:
+      label: "Plataforma"
+      options: ["NetHAL Core (SDK)", "NetHAL Lab (app)", "Driver/Protocolo", "Segurança/Telemetria", "Infraestrutura"]
+    validations:
+      required: true
+
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: "Prioridade"
+      options: ["P0 — Urgente (produção quebrada)", "P1 — Importante (caminho crítico)", "P2 — Backlog"]
+    validations:
+      required: true
