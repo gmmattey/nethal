@@ -12,16 +12,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.nethal.core.capability.CapabilityEngine
 import com.nethal.core.model.NetworkTarget
+import com.nethal.feature.pairingdiscovery.PairingDiscoveryDependencies
+import com.nethal.feature.pairingdiscovery.PairingDiscoveryRoutes
+import com.nethal.feature.pairingdiscovery.pairingDiscoveryGraph
 import com.nethal.lab.ui.authentication.AuthenticationScreen
 import com.nethal.lab.ui.authentication.AuthenticationViewModel
 import com.nethal.lab.ui.capabilities.CapabilitiesScreen
 import com.nethal.lab.ui.capabilities.CapabilitiesViewModel
 import com.nethal.lab.ui.capabilities.CapabilityItem
 import com.nethal.lab.ui.common.NetHalViewModelFactory
-import com.nethal.lab.ui.discovery.DiscoveryScreen
-import com.nethal.lab.ui.discovery.DiscoveryViewModel
-import com.nethal.lab.ui.equipment.EquipmentDetectedScreen
-import com.nethal.lab.ui.equipment.EquipmentDetectedViewModel
 import com.nethal.lab.ui.onboarding.BetaOptInScreen
 import com.nethal.lab.ui.onboarding.BetaOptInViewModel
 import com.nethal.lab.ui.onboarding.WelcomeScreen
@@ -32,8 +31,6 @@ import com.nethal.lab.ui.report.ReportViewModel
 private object Routes {
     const val WELCOME = "welcome"
     const val BETA_OPT_IN = "beta_opt_in"
-    const val DISCOVERY = "discovery"
-    const val TARGET_SELECTED = "target_selected"
     const val AUTHENTICATION = "authentication"
     // Ordem de navegação deste app (Tela 3 → Tela 5 → Tela 4 → Tela 6) diverge da numeração da
     // spec (Tela 3 → Tela 4 → Tela 5) — decisão confirmada (ver KDoc de AuthenticationUiState):
@@ -49,13 +46,14 @@ private object Routes {
 @Composable
 fun NetHalNavHost(
     viewModelFactory: NetHalViewModelFactory,
+    pairingDiscoveryDependencies: PairingDiscoveryDependencies,
     navController: NavHostController = rememberNavController(),
 ) {
     // Guardado no escopo do NavHost (não dentro de um `composable {}`) para sobreviver à
-    // navegação entre "discovery" → "target_selected" → "authentication" → "capabilities" →
-    // "report". Os ViewModels dessas telas precisam desses valores no construtor (não dá para
-    // injetar via `SavedStateHandle` sem Parcelable/serializer dedicado nesta entrega) — factory
-    // por instância cobre isso.
+    // navegação entre o grafo de pareamento (`pairingDiscoveryGraph`) → "authentication" →
+    // "capabilities" → "report". Os ViewModels dessas telas precisam desses valores no
+    // construtor (não dá para injetar via `SavedStateHandle` sem Parcelable/serializer dedicado
+    // nesta entrega) — factory por instância cobre isso.
     var selectedTarget by remember { mutableStateOf<NetworkTarget?>(null) }
     var matchedProfileId by remember { mutableStateOf<String?>(null) }
     // Sessão autenticada entregue pela Tela 5 (`AuthenticationViewModel.captureAuthenticatedSession`)
@@ -101,58 +99,31 @@ fun NetHalNavHost(
             BetaOptInScreen(
                 viewModel = viewModel,
                 onDecided = {
-                    navController.navigate(Routes.DISCOVERY) {
+                    navController.navigate(PairingDiscoveryRoutes.GRAPH) {
                         popUpTo(Routes.WELCOME) { inclusive = true }
                     }
                 },
             )
         }
 
-        composable(Routes.DISCOVERY) {
-            val viewModel: DiscoveryViewModel = viewModel(factory = viewModelFactory)
-
-            DiscoveryScreen(
-                viewModel = viewModel,
-                onSingleCandidateReady = { target ->
-                    selectedTarget = target
-                    navController.navigate(Routes.TARGET_SELECTED)
-                },
-                onCandidateChosen = { target ->
-                    selectedTarget = target
-                    navController.navigate(Routes.TARGET_SELECTED)
-                },
-            )
-        }
-
-        composable(Routes.TARGET_SELECTED) {
-            val target = selectedTarget
-            if (target == null) {
-                // Estado perdido (ex.: processo recriado) — volta para a descoberta em vez
-                // de mostrar uma tela sem dado nenhum.
-                navController.navigate(Routes.DISCOVERY) {
-                    popUpTo(Routes.DISCOVERY) { inclusive = true }
-                }
-            } else {
-                val viewModel: EquipmentDetectedViewModel = viewModel(
-                    factory = viewModelFactory.forEquipmentDetected(target),
-                )
-                EquipmentDetectedScreen(
-                    viewModel = viewModel,
-                    onContinue = { profileId ->
-                        matchedProfileId = profileId
-                        navController.navigate(Routes.AUTHENTICATION)
-                    },
-                )
-            }
-        }
+        // Telas 2a/2b/2g/2h/2i (issues #74, #75, #80, #81, #82) — módulo :feature:pairing-discovery.
+        pairingDiscoveryGraph(
+            navController = navController,
+            dependencies = pairingDiscoveryDependencies,
+            onEquipmentConfirmed = { target, profileId ->
+                selectedTarget = target
+                matchedProfileId = profileId
+                navController.navigate(Routes.AUTHENTICATION)
+            },
+        )
 
         composable(Routes.AUTHENTICATION) {
             val target = selectedTarget
             if (target == null) {
-                // Mesmo raciocínio de TARGET_SELECTED acima — estado perdido, volta para a
+                // Mesmo raciocínio do grafo de pareamento — estado perdido, volta para a
                 // descoberta em vez de tentar autenticar sem NetworkTarget nenhum.
-                navController.navigate(Routes.DISCOVERY) {
-                    popUpTo(Routes.DISCOVERY) { inclusive = true }
+                navController.navigate(PairingDiscoveryRoutes.GRAPH) {
+                    popUpTo(PairingDiscoveryRoutes.GRAPH) { inclusive = true }
                 }
             } else {
                 val viewModel: AuthenticationViewModel = viewModel(

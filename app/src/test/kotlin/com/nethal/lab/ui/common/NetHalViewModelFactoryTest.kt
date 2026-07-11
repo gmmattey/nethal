@@ -2,23 +2,11 @@ package com.nethal.lab.ui.common
 
 import com.nethal.core.catalog.DriverFamilyRegistry
 import com.nethal.core.catalog.DriverRegistry
-import com.nethal.core.catalog.ManualIdentificationCandidate
-import com.nethal.core.catalog.ManualIdentificationRepository
 import com.nethal.core.catalog.CompatibilityProfile
-import com.nethal.core.discovery.DiscoveryEngine
-import com.nethal.core.discovery.NetworkEnvironment
-import com.nethal.core.discovery.NetworkEnvironmentReader
-import com.nethal.core.fingerprint.FingerprintEngine
-import com.nethal.core.fingerprint.FingerprintResult
-import com.nethal.core.model.DiscoveryResult
-import com.nethal.core.model.NetworkTarget
 import com.nethal.feature.settings.SettingsViewModel
 import com.nethal.lab.FakeConsentRepository
-import com.nethal.lab.ui.discovery.DiscoveryViewModel
 import com.nethal.lab.ui.onboarding.BetaOptInViewModel
 import com.nethal.lab.ui.onboarding.WelcomeViewModel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,21 +21,6 @@ class NetHalViewModelFactoryTest {
 
     private val factory = NetHalViewModelFactory(
         consentRepository = FakeConsentRepository(),
-        discoveryEngine = object : DiscoveryEngine {
-            override suspend fun discover(): DiscoveryResult =
-                DiscoveryResult(devices = emptyList(), possibleDoubleNat = false)
-        },
-        networkEnvironmentReader = object : NetworkEnvironmentReader {
-            override suspend fun read(): NetworkEnvironment? = null
-        },
-        fingerprintEngine = object : FingerprintEngine {
-            override suspend fun identify(target: NetworkTarget): FingerprintResult =
-                throw UnsupportedOperationException("não usado neste teste")
-        },
-        manualIdentificationRepository = object : ManualIdentificationRepository {
-            override fun observeCandidates(): Flow<List<ManualIdentificationCandidate>> = flowOf(emptyList())
-            override suspend fun submit(candidate: ManualIdentificationCandidate) = Unit
-        },
         driverRegistry = object : DriverRegistry {
             override fun manifestVersion(): String = "test"
             override fun generatedAt(): String = "test"
@@ -74,11 +47,6 @@ class NetHalViewModelFactoryTest {
     @Test
     fun `create still resolves SettingsViewModel`() {
         assertTrue(factory.create(SettingsViewModel::class.java) is SettingsViewModel)
-    }
-
-    @Test
-    fun `create still resolves DiscoveryViewModel`() {
-        assertTrue(factory.create(DiscoveryViewModel::class.java) is DiscoveryViewModel)
     }
 
     @Test

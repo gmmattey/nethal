@@ -16,17 +16,16 @@ class MainActivity : ComponentActivity() {
         val app = application as NetHalApplication
         val viewModelFactory = NetHalViewModelFactory(
             consentRepository = app.consentRepository,
-            discoveryEngine = app.discoveryEngine,
-            networkEnvironmentReader = app.networkEnvironmentReader,
-            fingerprintEngine = app.fingerprintEngine,
-            manualIdentificationRepository = app.manualIdentificationRepository,
             driverRegistry = app.driverRegistry,
             driverFamilyRegistry = app.driverFamilyRegistry,
         )
 
         setContent {
             NetHalLabTheme {
-                NetHalNavHost(viewModelFactory = viewModelFactory)
+                NetHalNavHost(
+                    viewModelFactory = viewModelFactory,
+                    pairingDiscoveryDependencies = app.pairingDiscoveryDependencies,
+                )
             }
         }
     }

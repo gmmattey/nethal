@@ -23,6 +23,7 @@ import com.nethal.core.telemetry.HttpTelemetryCollector
 import com.nethal.core.telemetry.TelemetryCollector
 import com.nethal.core.telemetry.TelemetryDeviceIdRepository
 import com.nethal.core.telemetry.TelemetryEndpointConfig
+import com.nethal.feature.pairingdiscovery.PairingDiscoveryDependencies
 import com.nethal.lab.data.catalog.ManualIdentificationDataStoreRepository
 import com.nethal.lab.data.catalog.manualIdentificationDataStore
 import com.nethal.lab.data.consent.ConsentDataStoreRepository
@@ -88,6 +89,14 @@ class NetHalApplication : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    /**
+     * Dependências injetadas em `pairingDiscoveryGraph()` (`:feature:pairing-discovery`, ADR
+     * 0002) — composição manual a partir dos mesmos engines/registries já montados acima, sem
+     * duplicar construção.
+     */
+    lateinit var pairingDiscoveryDependencies: PairingDiscoveryDependencies
+        private set
+
     override fun onCreate() {
         super.onCreate()
         consentRepository = ConsentDataStoreRepository(consentDataStore)
@@ -119,6 +128,14 @@ class NetHalApplication : Application() {
             driverRegistry = driverRegistry,
         )
         manualIdentificationRepository = ManualIdentificationDataStoreRepository(manualIdentificationDataStore)
+
+        pairingDiscoveryDependencies = PairingDiscoveryDependencies(
+            discoveryEngine = discoveryEngine,
+            networkEnvironmentReader = networkEnvironmentReader,
+            fingerprintEngine = fingerprintEngine,
+            manualIdentificationRepository = manualIdentificationRepository,
+            driverRegistry = driverRegistry,
+        )
 
         httpTransport = DefaultHttpTransport(
             HttpTransportConfig(
