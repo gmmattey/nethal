@@ -12,15 +12,15 @@ import kotlinx.coroutines.launch
 
 /**
  * Orquestra a Tela 4 — Capabilities (spec §11): lê cada [CapabilityId] do vocabulário oficial
- * usando a MESMA sessão (mesma instância de [CapabilityEngine]) já autenticada com sucesso na
- * Tela 5 — recebida pronta via construtor (handoff feito por
- * `AuthenticationViewModel.captureAuthenticatedSession()`/`NetHalNavHost`), nunca cria uma sessão
- * nova nem pede credencial de novo.
+ * usando a MESMA sessão (mesma instância de [CapabilityEngine]) já autenticada com sucesso no
+ * cluster de Login (`:feature:pairing-auth`, telas 2c/2e) — recebida pronta via construtor
+ * (handoff feito por `PairingAuthViewModel.captureAuthenticatedSession()`/`NetHalNavHost`), nunca
+ * cria uma sessão nova nem pede credencial de novo.
  *
  * `driverRegistry`/`matchedProfileId` só servem para exibir vendor/model no cabeçalho da tela —
- * mesmo padrão de resolução de profile já usado por `AuthenticationViewModel`, não uma segunda
- * fonte de verdade sobre qual driver está ativo (a sessão em si já está resolvida contra o driver
- * certo, montada na Tela 5).
+ * mesmo padrão de resolução de profile já usado por `PairingAuthViewModel`, não uma segunda fonte
+ * de verdade sobre qual driver está ativo (a sessão em si já está resolvida contra o driver certo,
+ * montada no cluster de Login).
  *
  * Lê sequencialmente (não em paralelo): [CapabilityEngine.readCapability] pode disparar uma
  * renovação automática de sessão por trás (`SessionExpired`), e essa renovação não foi desenhada

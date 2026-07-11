@@ -23,6 +23,7 @@ import com.nethal.core.telemetry.HttpTelemetryCollector
 import com.nethal.core.telemetry.TelemetryCollector
 import com.nethal.core.telemetry.TelemetryDeviceIdRepository
 import com.nethal.core.telemetry.TelemetryEndpointConfig
+import com.nethal.feature.pairingauth.PairingAuthDependencies
 import com.nethal.feature.pairingdiscovery.PairingDiscoveryDependencies
 import com.nethal.lab.data.catalog.ManualIdentificationDataStoreRepository
 import com.nethal.lab.data.catalog.manualIdentificationDataStore
@@ -97,6 +98,14 @@ class NetHalApplication : Application() {
     lateinit var pairingDiscoveryDependencies: PairingDiscoveryDependencies
         private set
 
+    /**
+     * Dependências injetadas em `pairingAuthGraph()` (`:feature:pairing-auth`, issues #76-#79,
+     * ADR 0002) — o `HttpTransport` de autenticação **não** entra aqui: é construído internamente
+     * pelo próprio módulo (ver KDoc de `buildPairingAuthHttpTransport` em `PairingAuthGraph.kt`).
+     */
+    lateinit var pairingAuthDependencies: PairingAuthDependencies
+        private set
+
     override fun onCreate() {
         super.onCreate()
         consentRepository = ConsentDataStoreRepository(consentDataStore)
@@ -135,6 +144,11 @@ class NetHalApplication : Application() {
             fingerprintEngine = fingerprintEngine,
             manualIdentificationRepository = manualIdentificationRepository,
             driverRegistry = driverRegistry,
+        )
+
+        pairingAuthDependencies = PairingAuthDependencies(
+            driverRegistry = driverRegistry,
+            driverFamilyRegistry = driverFamilyRegistry,
         )
 
         httpTransport = DefaultHttpTransport(

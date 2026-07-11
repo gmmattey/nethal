@@ -8,10 +8,10 @@ import com.nethal.core.model.CapabilityId
  * que não estiver `AVAILABLE`, o motivo (campo `reason` de [CapabilityReadResult] — mesmo
  * vocabulário do core, sem reinterpretação nova aqui).
  *
- * Lê a partir da MESMA sessão autenticada aberta na Tela 5 (Autenticação) — nunca abre uma nova
- * (ver `CapabilitiesViewModel`, que recebe o `CapabilityEngine` já ativo via
- * `AuthenticationViewModel.captureAuthenticatedSession()`/`NetHalNavHost`, mesmo padrão de estado
- * compartilhado já usado ali para `NetworkTarget` entre Discovery e EquipmentDetected).
+ * Lê a partir da MESMA sessão autenticada aberta no cluster de Login (`:feature:pairing-auth`,
+ * telas 2c/2e) — nunca abre uma nova (ver `CapabilitiesViewModel`, que recebe o `CapabilityEngine`
+ * já ativo via `PairingAuthViewModel.captureAuthenticatedSession()`/`NetHalNavHost`, mesmo padrão
+ * de estado compartilhado já usado ali para `NetworkTarget` entre Discovery e EquipmentDetected).
  */
 sealed interface CapabilitiesUiState {
 
