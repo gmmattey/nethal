@@ -19,6 +19,7 @@ import com.nethal.lab.ui.capabilities.CapabilitiesViewModel
 import com.nethal.lab.ui.capabilities.CapabilityItem
 import com.nethal.lab.ui.discovery.DiscoveryViewModel
 import com.nethal.lab.ui.equipment.EquipmentDetectedViewModel
+import com.nethal.lab.ui.onboarding.BetaOptInViewModel
 import com.nethal.lab.ui.onboarding.WelcomeViewModel
 import com.nethal.lab.ui.report.ReportViewModel
 import com.nethal.lab.ui.settings.SettingsViewModel
@@ -42,6 +43,7 @@ class NetHalViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when (modelClass) {
             WelcomeViewModel::class.java -> WelcomeViewModel(consentRepository) as T
+            BetaOptInViewModel::class.java -> BetaOptInViewModel(consentRepository) as T
             SettingsViewModel::class.java -> SettingsViewModel(consentRepository) as T
             DiscoveryViewModel::class.java -> DiscoveryViewModel(discoveryEngine, networkEnvironmentReader) as T
             else -> throw IllegalArgumentException("Unknown ViewModel class: $modelClass")
