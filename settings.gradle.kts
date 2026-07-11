@@ -17,4 +17,5 @@ dependencyResolutionManagement {
 rootProject.name = "NetHAL"
 
 include(":core")
+include(":core:model")
 include(":app")
