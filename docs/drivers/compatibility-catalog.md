@@ -329,6 +329,54 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
 
 ## Changelog
 
+- **2026-07-10 (issue #19 — `authenticate()` real no `tplink-legacy-cgi`; `readCapability()` sai do
+  estado "sempre `Unavailable`")** — Mesmo padrão de sessão gerenciada já usado por
+  `TpLinkStokLuciDriverFamily`/issue #16: `TpLinkLegacyCgiDriverFamily` ganha `authenticate()` real
+  (campo `authenticatedClient`, preenchido pelo handshake já existente — este protocolo não tem
+  endpoint de login dedicado, "autenticar" continua sendo a mesma primeira leitura real de sempre) e
+  `readCapability(id)` passa a usar essa sessão em vez de devolver `Unavailable` incondicionalmente.
+  Diferente do `stok-luci` (um único endpoint devolve tudo), este protocolo tem um bundle `/cgi`
+  dedicado por capability — cada leitura busca só o bundle de que precisa (mesma separação já usada
+  por `readSnapshot`), então `authenticate()` só valida a credencial (1 chamada), sem custo de ler
+  Wi-Fi/clientes antecipadamente. `login()`/`readSnapshot()` (usados por `ManualCheckRunnerC20`) não
+  foram alterados — continuam fazendo login novo a cada chamada.
+
+  `TpLinkLegacyCgiLoginFailureReason.SESSION_EXPIRED` (novo) mapeia HTTP 401/403 numa leitura
+  autenticada pós-login para `CapabilityReadResult.SessionExpired` — antes,
+  `fetchAuthenticated` nem checava `statusCode` (nada reaproveitava a sessão entre chamadas para uma
+  expiração ter chance de acontecer). Mesma heurística conservadora e mesma ressalva do `stok-luci`:
+  sem confirmação por evidência ao vivo desse cenário específico contra o hardware do Luiz.
+
+  `READ_DEVICE_INFO` ganhou parser ligado ao vocabulário público pela primeira vez em qualquer Driver
+  Family do NetHAL — novo caso `CapabilityPayload.DeviceInfo(info: DeviceInfo)` em
+  `core/model/CapabilityPayload.kt` (o tipo `DeviceInfo` já existia em `core/model/DeviceInfo.kt`,
+  só não estava ligado a nenhum payload de capability ainda). `vendor = "TP-Link"` é hardcoded como
+  fato conhecido desta plataforma (todo profile sob `tplink-legacy-cgi-driver` é um equipamento
+  TP-Link — o protocolo em si não expõe campo de fabricante), não uma inferência de dado nem
+  `if (vendor == ...)`; `firmware`/`hardwareVersion`/`serialNumberHash`/`uptimeSeconds`/`deviceType`
+  ficam `null` — nenhum desses campos apareceu na captura real (SIG-337/SIG-338) do bundle
+  IGD_DEV_INFO+ETH_SWITCH+SYS_MODE. `app/.../CapabilityDisplay.kt` (`when` exaustivo sobre
+  `CapabilityPayload`) ganhou o branch correspondente para continuar compilando.
+
+  Nota de telemetria para a Marisa: `READ_CONNECTED_CLIENTS` deste driver mapeia
+  `TpLinkLegacyCgiConnectedClient.macAddressMasked` (já mascarado no parser,
+  `TpLinkLegacyCgiResponseParser.maskMac`) direto para `ConnectedClient.macAddress` — o modelo público
+  espera dado bruto por decisão do ADR 0001 (mascaramento é fronteira de exportação de um futuro
+  Telemetry Collector, não do modelo local), mas este parser já mascarava antes do ADR existir e não
+  foi tocado nesta entrega (fora de escopo da issue #19). Divergência pré-existente, não introduzida
+  aqui — sinalizada para revisão de telemetria, não corrigida silenciosamente.
+
+  **Estágio do profile:** permanece `READ_ONLY_ALPHA`, sem promoção (fora de escopo desta issue —
+  critério de promoção é `/ciclo-vida-driver`, decisão de Rafael). Escopo estritamente `READ_ONLY`,
+  nenhuma ação de escrita. Nenhum campo do manifesto (`catalog-2026.07.13.json` vigente) foi alterado
+  — mudança é só de código (`DriverFamily`), sem mudança de schema/dado publicado.
+
+  Suíte `:core:test` verde (18 testes novos/atualizados entre
+  `TpLinkLegacyCgiDriverFamilyTest`/`TpLinkLegacyCgiCapabilityEngineIntegrationTest`, 214 testes no
+  total do módulo, 0 falhas). Módulo `:app` não pôde ser compilado neste ambiente (sem
+  `ANDROID_HOME`) — o branch novo em `CapabilityDisplay.kt` não foi verificado por build real, só
+  por leitura; validação de app fica para a Marisa/gate de QA com Android SDK disponível.
+
 - **2026-07-09 (Diego — verificação da hipótese "HTTP 299 tratado como não-sucesso" a partir do
   `NOKIA_GPON_FIELD_MAP.md` do SignallQ: não confirmada, nenhum bug adicional; corrobora o fix
   anterior; `stage` mantido, sem decisão de promoção)** — Luiz trouxe um levantamento irmão feito no
