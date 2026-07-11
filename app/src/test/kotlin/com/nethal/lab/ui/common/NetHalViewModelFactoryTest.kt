@@ -12,11 +12,11 @@ import com.nethal.core.fingerprint.FingerprintEngine
 import com.nethal.core.fingerprint.FingerprintResult
 import com.nethal.core.model.DiscoveryResult
 import com.nethal.core.model.NetworkTarget
+import com.nethal.feature.settings.SettingsViewModel
 import com.nethal.lab.FakeConsentRepository
 import com.nethal.lab.ui.discovery.DiscoveryViewModel
 import com.nethal.lab.ui.onboarding.BetaOptInViewModel
 import com.nethal.lab.ui.onboarding.WelcomeViewModel
-import com.nethal.lab.ui.settings.SettingsViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertThrows

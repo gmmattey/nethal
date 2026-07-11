@@ -26,13 +26,11 @@ import com.nethal.lab.ui.onboarding.BetaOptInScreen
 import com.nethal.lab.ui.onboarding.BetaOptInViewModel
 import com.nethal.lab.ui.onboarding.WelcomeScreen
 import com.nethal.lab.ui.onboarding.WelcomeViewModel
-import com.nethal.lab.ui.privacy.PrivacyScreen
 import com.nethal.lab.ui.report.ReportScreen
 import com.nethal.lab.ui.report.ReportViewModel
 
 private object Routes {
     const val WELCOME = "welcome"
-    const val PRIVACY = "privacy"
     const val BETA_OPT_IN = "beta_opt_in"
     const val DISCOVERY = "discovery"
     const val TARGET_SELECTED = "target_selected"
@@ -82,13 +80,20 @@ fun NetHalNavHost(
             WelcomeScreen(
                 viewModel = viewModel,
                 onStartDiagnosis = { navController.navigate(Routes.BETA_OPT_IN) },
-                onViewPrivacy = { navController.navigate(Routes.PRIVACY) },
+                // `PrivacyScreen` foi descontinuada (decisão #66) — conteúdo absorvido pelo item
+                // "Política de privacidade" dentro de Configurações (`:feature:settings`, #85).
+                // `BottomNavHost` monta seu próprio `NavHostController` interno (não recebe o
+                // deste `NavHost`), então não dá para pular direto para a sub-rota de privacidade
+                // a partir daqui sem invadir o escopo de #67/#85 — só leva para o shell "home" por
+                // enquanto. Wiring definitivo ("Ver privacidade" → item exato de Configurações) é
+                // trabalho do redesenho da tela de Boas-vindas (#68), não desta issue.
+                onViewPrivacy = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.WELCOME) { inclusive = true }
+                    }
+                },
                 onExit = { /* encerrado pela Activity host */ },
             )
-        }
-
-        composable(Routes.PRIVACY) {
-            PrivacyScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.BETA_OPT_IN) {

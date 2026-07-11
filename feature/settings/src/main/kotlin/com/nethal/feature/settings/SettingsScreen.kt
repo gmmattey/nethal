@@ -1,0 +1,165 @@
+package com.nethal.feature.settings
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.nethal.core.designsystem.theme.ErrorDark
+import com.nethal.core.designsystem.theme.OnSurfaceVariantDark
+
+/**
+ * Tela "Configurações" (issue #85), layout dos protótipos `3c`/`3f`
+ * (`docs/design/prototypes.dc.html`). Reaproveita `SettingsViewModel` (movido de `:app` para este
+ * módulo, ADR 0002 Fase 2) para o toggle de saída do programa beta — decisão #66: o opt-in em si
+ * fica no onboarding "Notificações" (#71), aqui só referencia o mesmo estado.
+ *
+ * Seções `EQUIPAMENTO` e `FERRAMENTAS AVANÇADAS` do protótipo **não entram nesta entrega**:
+ * - `EQUIPAMENTO` (reiniciar, atualizar firmware, trocar senha de admin, restaurar padrões de
+ *   fábrica) exige uma sessão de equipamento ativa cross-tab, que não existe nesta arquitetura
+ *   (o `BottomNavHost`/#67 não carrega `CapabilityEngine`/`NetworkTarget` nenhum para as abas) e
+ *   capabilities de escrita que nenhum driver declara hoje (`READ_ONLY_ALPHA` em todos). Implementar
+ *   botões que não fazem nada, ou que fingem uma sessão que não existe, é pior que não ter a seção.
+ * - `FERRAMENTAS AVANÇADAS` aponta para telas de ferramentas (`#4a`-`#4i`) que vivem em módulos
+ *   `:feature:tools-*` (#89-96) que ainda não existem — linkar para lá violaria a regra de
+ *   dependência única da ADR 0002 (`:feature:*` nunca depende de outro `:feature:*`).
+ *
+ * Ambas ficam registradas como gap conhecido (não peça de UI escondida) — Rafael decide se abre
+ * issue de acompanhamento quando a base (#83/#84 e #89-96) existir.
+ *
+ * Itens sem dado real (Notificações/Aparência/Idioma sem tela própria, Termos de uso e Licenças de
+ * código aberto sem conteúdo) aparecem como linha não-interativa com rótulo "Em breve" — nunca um
+ * número ou destino inventado. "Aparência: Escuro" e "Idioma: Português (Brasil)" são fatos reais
+ * do app hoje (dark-only, só pt-BR), não dado fabricado.
+ */
+@Composable
+fun SettingsScreen(
+    viewModel: SettingsViewModel,
+    appVersionLabel: String,
+    onOpenPrivacy: () -> Unit,
+) {
+    val isBetaProgramActive by viewModel.isBetaProgramActive.collectAsState()
+
+    Scaffold { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 22.dp, vertical = 14.dp)
+                .verticalScroll(rememberScrollState())
+                .testTag("home_settings_screen"),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Text(
+                text = "Configurações",
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+            )
+
+            BetaProgramSection(
+                isActive = isBetaProgramActive,
+                onLeaveClick = viewModel::leaveBetaProgram,
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SettingsSectionHeader("APLICATIVO")
+                SettingsSectionCard {
+                    SettingsRow(
+                        title = "Notificações",
+                        trailingText = "Em breve",
+                        showChevron = false,
+                    )
+                    SettingsRow(
+                        title = "Aparência",
+                        trailingText = "Escuro",
+                        showChevron = false,
+                    )
+                    SettingsRow(
+                        title = "Idioma",
+                        trailingText = "Português (Brasil)",
+                        showChevron = false,
+                        showDivider = false,
+                    )
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SettingsSectionHeader("SOBRE")
+                SettingsSectionCard {
+                    SettingsRow(
+                        title = "Política de privacidade",
+                        onClick = onOpenPrivacy,
+                    )
+                    SettingsRow(
+                        title = "Termos de uso",
+                        trailingText = "Em breve",
+                        showChevron = false,
+                    )
+                    SettingsRow(
+                        title = "Licenças de código aberto",
+                        trailingText = "Em breve",
+                        showChevron = false,
+                    )
+                    SettingsRow(
+                        title = "Versão do app",
+                        trailingText = appVersionLabel,
+                        showChevron = false,
+                        showDivider = false,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BetaProgramSection(isActive: Boolean, onLeaveClick: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SettingsSectionHeader("PROGRAMA BETA")
+        SettingsSectionCard {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = if (isActive) {
+                        "Você está participando do programa de testers beta."
+                    } else {
+                        "Você não está participando do programa de testers beta."
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+
+                if (isActive) {
+                    Text(
+                        text = "Sair interrompe o envio de novos relatórios. Relatórios já " +
+                            "enviados são anônimos e não podem ser removidos individualmente.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OnSurfaceVariantDark,
+                    )
+
+                    OutlinedButton(
+                        onClick = onLeaveClick,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Sair do programa beta", color = ErrorDark)
+                    }
+                }
+            }
+        }
+    }
+}
