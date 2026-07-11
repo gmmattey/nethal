@@ -24,6 +24,8 @@ import com.nethal.core.telemetry.HttpTelemetryCollector
 import com.nethal.core.telemetry.TelemetryCollector
 import com.nethal.core.telemetry.TelemetryDeviceIdRepository
 import com.nethal.core.telemetry.TelemetryEndpointConfig
+import com.nethal.lab.telemetry.TelemetryAppLifecycleObserver
+import com.nethal.lab.telemetry.installTelemetryUncaughtExceptionHandler
 import com.nethal.feature.pairingauth.PairingAuthDependencies
 import com.nethal.feature.pairingdiscovery.PairingDiscoveryDependencies
 import com.nethal.lab.data.catalog.ManualIdentificationDataStoreRepository
@@ -97,14 +99,19 @@ class NetHalApplication : Application() {
         private set
 
     /**
-     * Telemetria do NetHAL Lab para o SignallQ Console (issue #97, Lane A — sessão/capability, ver
-     * `core/telemetry`). `endpoint` fica vazio de propósito: as rotas `/ingest/nethal/...` ainda não
-     * existem do lado do SignallQ (`linka-android#886` em aberto) — enquanto isso,
-     * `HttpTelemetryCollector` é no-op mesmo com consentimento concedido. `consentProvider` lê um
-     * snapshot síncrono de `ConsentScope.TELEMETRY_BETA`, mantido atualizado por uma coleta em
-     * segundo plano do `ConsentRepository` real (`applicationScope`, escopo de vida do processo).
-     * Sem call site ainda (nenhuma tela chama `sendDiagnosticSession`/`sendCapabilityResult`) — só
-     * exposto, mesmo espírito de `httpTransport` acima.
+     * Telemetria do NetHAL Lab para o SignallQ Console (issue #97, Lanes A e B — sessão/capability +
+     * eventos de produto, ver `core/telemetry`). `endpoint` fica vazio de propósito: as rotas
+     * `/ingest/nethal/...` ainda não existem do lado do SignallQ (`linka-android#886` em aberto) —
+     * enquanto isso, `HttpTelemetryCollector` é no-op mesmo com consentimento concedido.
+     * `consentProvider` lê um snapshot síncrono de `ConsentScope.TELEMETRY_BETA`, mantido atualizado
+     * por uma coleta em segundo plano do `ConsentRepository` real (`applicationScope`, escopo de vida
+     * do processo).
+     *
+     * Lane A (`sendDiagnosticSession`/`sendCapabilityResult`) ainda sem call site — exposta, não
+     * consumida (fora do escopo desta issue). Lane B (`sendProductEvent`) já tem call site real:
+     * `screen_view` via `TelemetryScreenViewReporter` (`:app/ui/navigation`), `session_start`/
+     * `session_end` via [TelemetryAppLifecycleObserver] e `feature_crash` via
+     * [installTelemetryUncaughtExceptionHandler], ambos registrados abaixo.
      */
     lateinit var telemetryCollector: TelemetryCollector
         private set
@@ -145,6 +152,13 @@ class NetHalApplication : Application() {
             deviceIdRepository = telemetryDeviceIdRepository,
             consentProvider = { telemetryConsentGranted.value },
         )
+
+        // Lane B (issue #97) — session_start/session_end por foreground/background real (ver KDoc de
+        // TelemetryAppLifecycleObserver) e feature_crash sem mascarar o crash real.
+        registerActivityLifecycleCallbacks(
+            TelemetryAppLifecycleObserver(telemetryCollector = telemetryCollector, scope = applicationScope),
+        )
+        installTelemetryUncaughtExceptionHandler(telemetryCollector = telemetryCollector, scope = applicationScope)
 
         networkEnvironmentReader = AndroidNetworkEnvironmentReader(this)
         discoveryEngine = DefaultDiscoveryEngine(

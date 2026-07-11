@@ -16,6 +16,7 @@ import com.nethal.core.capability.CapabilityEngine
 import com.nethal.core.catalog.DriverRegistry
 import com.nethal.core.consent.ConsentRepository
 import com.nethal.core.model.NetworkTarget
+import com.nethal.core.telemetry.TelemetryCollector
 import com.nethal.feature.onboarding.OnboardingPermissionsState
 import com.nethal.feature.onboarding.navigation.OnboardingRoutes
 import com.nethal.feature.onboarding.navigation.onboardingGraph
@@ -90,8 +91,14 @@ fun NetHalNavHost(
     onboardingPermissionsState: () -> OnboardingPermissionsState,
     pairingDiscoveryDependencies: PairingDiscoveryDependencies,
     pairingAuthDependencies: PairingAuthDependencies,
+    telemetryCollector: TelemetryCollector,
     navController: NavHostController = rememberNavController(),
 ) {
+    // `screen_view` (issue #97, Lane B) — cobre onboarding e pareamento, que vivem neste NavHost
+    // raiz. `BottomNavHost`, abaixo, reporta pelo seu próprio `NavHostController` (grafo aninhado
+    // separado).
+    TelemetryScreenViewReporter(navController = navController, telemetryCollector = telemetryCollector)
+
     // O `startDestination` depende do marcador persistido de onboarding, que chega de forma assíncrona
     // pelo DataStore. Enquanto não temos o primeiro valor (`null`), não compomos o `NavHost`:
     // `startDestination` só é lido na primeira composição, então compor com um palpite e "corrigir"
@@ -201,6 +208,7 @@ fun NetHalNavHost(
                 viewModelFactory = viewModelFactory,
                 capabilityEngine = homeCapabilityEngine,
                 pairedDeviceIp = homeDeviceIp,
+                telemetryCollector = telemetryCollector,
             )
         }
     }

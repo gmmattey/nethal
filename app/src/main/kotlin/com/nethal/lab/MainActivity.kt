@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
                     onboardingPermissionsState = { onboardingPermissionsState(this) },
                     pairingDiscoveryDependencies = app.pairingDiscoveryDependencies,
                     pairingAuthDependencies = app.pairingAuthDependencies,
+                    telemetryCollector = app.telemetryCollector,
                 )
             }
         }
