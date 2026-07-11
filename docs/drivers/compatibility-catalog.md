@@ -414,8 +414,8 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   os dois profiles novos são `DRAFT` (rank de maturidade mínimo), nunca vencem o desempate de
   `DefaultFingerprintEngine` contra os profiles TP-Link já existentes.
 
-  Suíte `:core:test` verde (239 testes, 0 falhas — 220 já existentes após o merge de
-  `NokiaGponDriverFamily` acima + 19 novos desta entrada: parser + driver family para as duas
+  Suíte `:core:test` verde (235 testes, 0 falhas — 220 já existentes após o merge de
+  `NokiaGponDriverFamily` acima + 15 novos desta entrada: parser + driver family para as duas
   famílias, cobrindo `authenticate`, sessão reaproveitada por `readCapability`, estado
   `EXPERIMENTAL` com `reason` explícito, e os casos honestos de `Unavailable`).
 
