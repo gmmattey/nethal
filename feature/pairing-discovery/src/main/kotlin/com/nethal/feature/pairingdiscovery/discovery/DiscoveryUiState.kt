@@ -1,4 +1,4 @@
-package com.nethal.lab.ui.discovery
+package com.nethal.feature.pairingdiscovery.discovery
 
 import com.nethal.core.model.NetworkTarget
 

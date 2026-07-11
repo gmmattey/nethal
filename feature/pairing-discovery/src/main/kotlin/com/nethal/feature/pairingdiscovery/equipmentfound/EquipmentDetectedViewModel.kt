@@ -1,4 +1,4 @@
-package com.nethal.lab.ui.equipment
+package com.nethal.feature.pairingdiscovery.equipmentfound
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

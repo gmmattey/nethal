@@ -1,16 +1,16 @@
-package com.nethal.lab.ui.discovery
+package com.nethal.feature.pairingdiscovery.discovery
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,15 +19,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nethal.core.model.NetworkTarget
 import com.nethal.core.model.TargetRole
 import com.nethal.core.model.TargetSource
+import com.nethal.feature.pairingdiscovery.internal.PairingTokens
+import com.nethal.feature.pairingdiscovery.manualentry.ManualIpField
 
 /**
  * Tela 2c — Múltiplos equipamentos encontrados (spec §11, SIG-318). Exibida quando
- * `devices.size > 1` ou `possibleDoubleNat == true`. Lista candidatos com papel e origem,
- * avisa sobre indício de duplo NAT e permite adicionar um equipamento manualmente por IP.
+ * `devices.size > 1` ou `possibleDoubleNat == true`. Lista candidatos com papel e origem, avisa
+ * sobre indício de duplo NAT e permite adicionar um equipamento manualmente por IP. Lógica e
+ * fluxo preservados — não faz parte do cluster de seleção manual (2g/2h/2i), é desambiguação
+ * entre candidatos já descobertos (decisão registrada na spec de #80).
  */
 @Composable
 fun MultipleCandidatesScreen(
@@ -38,10 +44,11 @@ fun MultipleCandidatesScreen(
 ) {
     var manualIp by remember { mutableStateOf("") }
 
-    Scaffold { padding ->
+    Scaffold(containerColor = PairingTokens.BackgroundPrincipal) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(PairingTokens.BackgroundPrincipal)
                 .padding(padding)
                 .padding(24.dp)
                 .verticalScroll(rememberScrollState()),
@@ -49,20 +56,23 @@ fun MultipleCandidatesScreen(
         ) {
             Text(
                 text = "Encontramos mais de um equipamento",
-                style = MaterialTheme.typography.headlineSmall,
+                color = PairingTokens.TextPrimary,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
             )
 
             Text(
                 text = "Escolha qual equipamento você quer testar.",
-                style = MaterialTheme.typography.bodyLarge,
+                color = PairingTokens.TextSecondary,
+                fontSize = 13.sp,
             )
 
             if (state.possibleDoubleNat) {
                 Text(
                     text = "Pode haver um equipamento adicional entre você e a internet " +
                         "(ex.: ONT da operadora).",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                    color = PairingTokens.Warning,
+                    fontSize = 12.5.sp,
                 )
             }
 
@@ -74,50 +84,39 @@ fun MultipleCandidatesScreen(
 
             Text(
                 text = "Ou informe outro equipamento manualmente:",
-                style = MaterialTheme.typography.titleMedium,
+                color = PairingTokens.TextPrimary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
             )
 
-            OutlinedTextField(
+            ManualIpField(
                 value = manualIp,
                 onValueChange = { manualIp = it },
-                label = { Text("IP do equipamento, ex.: 192.168.1.1") },
-                isError = manualTargetError != null,
-                modifier = Modifier.fillMaxWidth(),
+                error = manualTargetError,
+                onSubmit = { onAddManualTarget(manualIp) },
             )
-
-            if (manualTargetError != null) {
-                Text(
-                    text = manualTargetError,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-
-            Button(
-                onClick = { onAddManualTarget(manualIp) },
-                enabled = manualIp.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Adicionar equipamento")
-            }
         }
     }
 }
 
 @Composable
 private fun CandidateCard(device: NetworkTarget, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(text = device.ip, style = MaterialTheme.typography.titleMedium)
-            Text(text = roleLabel(device.role), style = MaterialTheme.typography.bodyMedium)
-            Text(
-                text = "Origem: ${sourceLabel(device.source)}",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(color = PairingTokens.Surface, shape = RoundedCornerShape(20.dp))
+            .border(width = 1.dp, color = PairingTokens.Border, shape = RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(text = device.ip, color = PairingTokens.TextPrimary, fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold)
+        Text(text = roleLabel(device.role), color = PairingTokens.TextSecondary, fontSize = 12.5.sp)
+        Text(
+            text = "Origem: ${sourceLabel(device.source)}",
+            color = PairingTokens.TextTertiary,
+            fontSize = 11.sp,
+        )
     }
 }
 

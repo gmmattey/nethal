@@ -1,4 +1,4 @@
-package com.nethal.lab.ui.equipment
+package com.nethal.feature.pairingdiscovery.equipmentfound
 
 import com.nethal.core.model.DetectedProtocol
 
