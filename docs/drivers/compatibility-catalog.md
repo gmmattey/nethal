@@ -415,6 +415,64 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
     `NokiaGponDriverFamilyTest`, 4 em `NokiaGponCapabilityEngineIntegrationTest`, 1 em
     `DriverFamilyRegistryIntegrationTest` provando a resolução real via catálogo embarcado).
 
+- **2026-07-10 (Bruno — completar as famílias órfãs `tplink-gdpr-cgi-driver`/`tplink-xdr-ds-driver`,
+  issue #20, sem hardware físico)** — Decisão do Luiz registrada no plano de fundação HAL: as duas
+  famílias (com login funcional, `readCapability()` sempre `Unavailable` até aqui) ganham
+  `authenticate()` real e parser experimental por capability, permanecendo órfãs de teste físico —
+  nunca promovidas além de `DRAFT`/`EXPERIMENTAL`. Detalhe completo de protocolo em
+  `docs/drivers/tplink-mercusys-families-2026-07-07.md` ("Atualização 2026-07-10").
+
+  **Novo manifesto `catalog-2026.07.26.json`** (`previousManifest: catalog-2026.07.25.json` — o
+  manifesto Nokia da entrada acima, mergeado depois deste trabalho ter começado; renomeado de
+  `catalog-2026.07.25.json` para `catalog-2026.07.26.json` durante o rebase para não colidir com o
+  manifesto Nokia, que já ocupava esse nome/versão), dois profiles novos:
+  - `tplink_archer_c50_v4` (`tplink-gdpr-cgi-driver`, estilo `C50_GDPR_BODY_LOGIN`/CBC) — `stage:
+    DRAFT`, `physicalTestAccess: false`. `READ_WIFI_STATUS`/`READ_CONNECTED_CLIENTS`: `EXPERIMENTAL`,
+    parser reaproveita a gramática de dispatcher clássico `/cgi` já confirmada ao vivo para
+    `tplink-legacy-cgi` (Archer C20) — o próprio corpo de login C50 usa essa gramática — com nomes de
+    oid/campo (`LAN_WLAN`, `LAN_HOST_ENTRY`) herdados por analogia, nunca confirmados para este ramo.
+    `READ_WAN_STATUS`/`READ_LAN_STATUS`/`READ_DEVICE_INFO`/`READ_FIRMWARE`: `UNKNOWN` (nenhuma base
+    documental para inferir oid/campo — mesma limitação já registrada para `tplink-legacy-cgi`).
+    `confidenceScoreOverall: 0.2`.
+  - `tplink_xdr3010_v2` (`tplink-xdr-ds-driver`) — `stage: DRAFT`, `physicalTestAccess: false`. Todas
+    as capabilities declaradas `UNKNOWN`, **decisão deliberada, não omissão**: diferente do
+    `tplink-gdpr-cgi`, a superfície JSON de `/ds` não compartilha gramática confirmada com nenhuma
+    outra família do NetHAL — só `error_code` tem uso confirmado (probe `get_encrypt_info` do
+    login). Declarar `EXPERIMENTAL` sem nenhum campo de capability mapeado prometeria parsing
+    inexistente, violando a regra "não prometer mais do que a evidência sustenta"
+    (`CLAUDE.md`/`SECURITY.md`). `readCapability()` ainda assim executa a leitura autenticada real
+    (sessão cacheada via `authenticate()`) e distingue, no `reason` do `Unavailable`, se a leitura em
+    si funcionou (`error_code=0`) de uma falha de sessão/rede — decisão registrada explicitamente
+    para revisão do Rafael, reversível sem mudança de código (só o `state`/`reason` do array
+    `capabilities[]`) se ele preferir `EXPERIMENTAL` mesmo sem parser de campo.
+    `confidenceScoreOverall: 0.15`.
+
+  Ambos os profiles usam `candidateIps`/`credentialConvention` genéricos por convenção de mercado da
+  linha TP-Link (mesmos valores dos demais profiles TP-Link do catálogo), nunca confirmados
+  especificamente para estes dois modelos — `ipConfidence`/`confidence` mais baixos que os profiles
+  com acesso físico refletem isso.
+
+  **Código:** `TpLinkGdprCgiDriverFamily`/`TpLinkXdrDsDriverFamily` ganharam `authenticatedClient`
+  cacheado (mesmo molde de `TpLinkStokLuciDriverFamily`, issue #16) — `login()`/`readRaw()`
+  anteriores preservados intactos (cobertura de teste existente não tocada).
+  `TpLinkGdprCgiDriverConfig` ganhou `capabilitySections` (config-driven, default vazio — não quebra
+  fixtures/profiles existentes). `TpLinkGdprCgiResponseParser`/`TpLinkXdrDsResponseParser` ganharam
+  parsing novo (`parseStackFields`/`isStackSuccess`; `parseErrorCode`, respectivamente).
+  `loadEmbeddedCatalogResource` e as asserções de `manifestVersion`/contagem de profiles em
+  `DriverRegistryTest`/`FingerprintEngineTest` atualizadas para o novo manifesto (6 profiles).
+  Verificado que os testes de fingerprint que dependem de `candidateIps` compartilhados
+  (`192.168.0.1`/`192.168.1.1`, também usados pelos dois profiles novos) continuam determinísticos:
+  os dois profiles novos são `DRAFT` (rank de maturidade mínimo), nunca vencem o desempate de
+  `DefaultFingerprintEngine` contra os profiles TP-Link já existentes.
+
+  Suíte `:core:test` verde (235 testes, 0 falhas — 220 já existentes após o merge de
+  `NokiaGponDriverFamily` acima + 15 novos desta entrada: parser + driver family para as duas
+  famílias, cobrindo `authenticate`, sessão reaproveitada por `readCapability`, estado
+  `EXPERIMENTAL` com `reason` explícito, e os casos honestos de `Unavailable`).
+
+  **Sem decisão de estágio:** nenhum dos dois profiles pode sair de `DRAFT` sem evidência de device
+  real — gate explícito para Rafael, não decidido nesta rodada (`/ciclo-vida-driver`).
+
 - **2026-07-09 (Diego — verificação da hipótese "HTTP 299 tratado como não-sucesso" a partir do
   `NOKIA_GPON_FIELD_MAP.md` do SignallQ: não confirmada, nenhum bug adicional; corrobora o fix
   anterior; `stage` mantido, sem decisão de promoção)** — Luiz trouxe um levantamento irmão feito no

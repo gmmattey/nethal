@@ -70,3 +70,49 @@
    - fluxo com `get_encrypt_info`
 4. Capturar payload bruto de leitura para cada família nova e só então promover parsers/capabilities específicas.
 5. Reavaliar, com hardware real, se `SG/CE_RED stok-luci` e `stok-luci senha específica` podem convergir para uma variante interna da família `stok-luci` ou se exigem famílias próprias.
+
+## Atualização 2026-07-10 (issue #20 — Bruno, completar as famílias órfãs, sem hardware físico)
+
+Decisão do Luiz (plano de fundação HAL): as duas famílias permanecem no core (não removidas), e
+ganham `authenticate()` real + parser experimental por capability, mas continuam sem promoção de
+estágio — nenhum dos itens da lista acima ("Próximos passos de validação física") foi cumprido
+nesta rodada, só documentação de protocolo (login) e reaproveitamento de gramática já confirmada em
+`tplink-legacy-cgi` (leitura).
+
+- `TpLinkGdprCgiDriverFamily`
+  - `authenticate()` real implementado — mesmo molde de `TpLinkStokLuciDriverFamily` (issue #16):
+    guarda o `TpLinkGdprCgiAuthenticationClient` autenticado numa instância, reaproveitado por
+    `readCapability()` sem novo login a cada leitura.
+  - `readCapability()` deixou de ser sempre `Unavailable`: para o estilo de login
+    `C50_GDPR_BODY_LOGIN` (único com gramática de leitura inferível), `READ_WIFI_STATUS` e
+    `READ_CONNECTED_CLIENTS` agora tentam um parser real
+    (`TpLinkGdprCgiResponseParser.parseStackFields`), reaproveitando a mesma gramática de
+    dispatcher clássico `[oid#stack]indice,qtd` + `campo=valor` já confirmada ao vivo para
+    `tplink-legacy-cgi` — o próprio corpo de login `C50_GDPR_BODY_LOGIN` usa essa gramática. Nomes
+    de oid/campo (`LAN_WLAN`→`name`/`SSID`, `LAN_HOST_ENTRY`→`hostName`/`IPAddress`/`MACAddress`)
+    são inferência disclosed por analogia com `tplink-legacy-cgi`, **nunca confirmados contra este
+    ramo especificamente**. Por isso o resultado nunca sobe além de `CapabilityState.EXPERIMENTAL`,
+    mesmo quando o parser "funciona" contra fixture sintética de teste. `MR_QUERY_LOGIN`/
+    `EX_JSON_GDPR_BODY_LOGIN` continuam retornando `Unavailable` explicando a falta de gramática de
+    leitura documentada para esses estilos — nenhum campo foi inventado para eles.
+  - `READ_WAN_STATUS`/`READ_LAN_STATUS`/`READ_DEVICE_INFO`/`READ_FIRMWARE` continuam `Unavailable`
+    sem seção configurada: nenhuma base documental (nem em `tplink-legacy-cgi`, que também não
+    confirmou seção de WAN) para inferir nome de oid/campo.
+- `TpLinkXdrDsDriverFamily`
+  - `authenticate()` real implementado (mesmo molde).
+  - `readCapability()` passou a executar a leitura autenticada real via sessão cacheada (prova que
+    transporte/sessão funcionam ponta a ponta), mas **deliberadamente não mapeia nenhum campo de
+    capability** — diferente do `tplink-gdpr-cgi`, a superfície JSON de `/ds` não compartilha
+    gramática confirmada com nenhuma outra família do NetHAL, só o campo `error_code` tem uso
+    confirmado (no probe `get_encrypt_info` do login). Inventar nome de campo de resposta violaria a
+    regra do projeto ("não prometer mais do que a evidência sustenta") — item 4 da lista acima
+    continua pendente. Toda capability retorna `Unavailable`, com motivo distinguindo se a leitura
+    em si teve sucesso (`error_code=0`) de uma falha de sessão/rede.
+- Catálogo: dois profiles novos em `catalog-2026.07.26.json` (`tplink_archer_c50_v4` →
+  `tplink-gdpr-cgi-driver`; `tplink_xdr3010_v2` → `tplink-xdr-ds-driver`), ambos `stage: DRAFT`,
+  `physicalTestAccess: false`. Capabilities com parser real (`READ_WIFI_STATUS`/
+  `READ_CONNECTED_CLIENTS` do C50) declaradas `EXPERIMENTAL`; as demais (incluindo **todas** as do
+  XDR3010, por decisão explícita — ver `compatibility-catalog.md`) declaradas `UNKNOWN`. Ver detalhe
+  completo e justificativa item a item em `docs/drivers/compatibility-catalog.md`.
+- Sem device real, nenhuma promoção de estágio ocorreu nem pode ocorrer — os 5 itens de "Próximos
+  passos de validação física" acima continuam abertos.
