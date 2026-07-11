@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
                 NetHalNavHost(
                     viewModelFactory = viewModelFactory,
                     pairingDiscoveryDependencies = app.pairingDiscoveryDependencies,
+                    pairingAuthDependencies = app.pairingAuthDependencies,
                 )
             }
         }

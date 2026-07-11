@@ -58,6 +58,7 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":core:designsystem"))
     implementation(project(":feature:pairing-discovery"))
+    implementation(project(":feature:pairing-auth"))
     implementation(project(":drivers:nokia-gpon"))
     implementation(project(":drivers:tplink-legacy-cgi"))
     implementation(project(":drivers:tplink-stok-luci"))
