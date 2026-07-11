@@ -2,6 +2,7 @@ package com.nethal.core.fingerprint
 
 import com.nethal.core.catalog.CompatibilityProfile
 import com.nethal.core.catalog.DriverRegistry
+import com.nethal.core.catalog.DriverStage
 import com.nethal.core.catalog.FingerprintEvidenceType
 import com.nethal.core.model.DetectedProtocol
 import com.nethal.core.model.NetworkTarget
@@ -64,10 +65,14 @@ class DefaultFingerprintEngine(
         val manifestGeneratedAt = driverRegistry.generatedAt()
         val detectedProtocols = detectProtocols(evidence)
 
+        // maxByOrNull sozinho desempataria pela ordem do catálogo (arbitrário) — em empate de
+        // score, dois profiles do mesmo vendor/model com candidateIps iguais (caso real: C6
+        // stok READ_ONLY_ALPHA vs. C6 DRAFT, issue #45) exigem preferir o estágio mais maduro,
+        // senão o roteamento pode cair no driver que não lê nada.
         val bestMatch = driverRegistry.profiles()
             .map { profile -> profile to scoreProfile(profile, target, evidence) }
             .filter { (_, score) -> score >= MINIMUM_REPORTABLE_CONFIDENCE }
-            .maxByOrNull { (_, score) -> score }
+            .maxWithOrNull(compareBy({ (_, score) -> score }, { (profile, _) -> stageMaturityRank(profile.stage) }))
 
         val (profile, score) = bestMatch ?: (null to 0.0)
 
@@ -85,6 +90,18 @@ class DefaultFingerprintEngine(
             manifestGeneratedAt = manifestGeneratedAt,
             rawEvidence = evidence,
         )
+    }
+
+    // DEPRECATED/BLOCKED ficam abaixo de DRAFT de propósito — nunca podem vencer um empate,
+    // mesmo que apareçam depois de STABLE no enum (ordinal não serve aqui).
+    private fun stageMaturityRank(stage: DriverStage): Int = when (stage) {
+        DriverStage.DEPRECATED, DriverStage.BLOCKED -> -1
+        DriverStage.DRAFT -> 0
+        DriverStage.DISCOVERY_ONLY -> 1
+        DriverStage.READ_ONLY_ALPHA -> 2
+        DriverStage.READ_ONLY_BETA -> 3
+        DriverStage.WRITE_BETA -> 4
+        DriverStage.STABLE -> 5
     }
 
     private fun scoreProfile(
