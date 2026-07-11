@@ -31,10 +31,12 @@ import com.nethal.lab.ui.capabilities.isSuccess
  * aviso de reprovisionamento por operadora (quando aplicável) e botão de envio de relatório
  * anônimo — que nunca envia nada de verdade nesta versão (ver `ReportViewModel.sendAnonymousReport`).
  *
- * `onFinish` encerra o fluxo de diagnóstico (decisão de UX: volta para a tela de boas-vindas em
- * vez de navegar para Ajustes — "Ajustes" não faz parte do funil de diagnóstico Tela 1-6 da spec,
- * é uma seção separada do app; ver `NetHalNavHost` para o `popUpTo` que limpa todo o estado da
- * sessão anterior).
+ * `onFinish` encerra o fluxo de diagnóstico e entra no "modo uso diário" (host de bottom nav, #67)
+ * em vez de voltar para a tela de boas-vindas — decisão superada em 2026-07-11: antes do host de
+ * bottom nav existir, não havia destino pós-funil além de reiniciar do zero; agora que existe um
+ * shell persistente (Status/Rede/Dispositivos/Configurações), faz mais sentido entrar nele do que
+ * descartar o contexto do equipamento recém-diagnosticado. Ver `NetHalNavHost` para o `popUpTo`
+ * que limpa todo o estado do funil de pareamento antes de entrar no host.
  */
 @Composable
 fun ReportScreen(viewModel: ReportViewModel, onFinish: () -> Unit) {

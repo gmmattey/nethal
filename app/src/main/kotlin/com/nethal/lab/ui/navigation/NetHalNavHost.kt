@@ -29,8 +29,6 @@ import com.nethal.lab.ui.onboarding.WelcomeViewModel
 import com.nethal.lab.ui.privacy.PrivacyScreen
 import com.nethal.lab.ui.report.ReportScreen
 import com.nethal.lab.ui.report.ReportViewModel
-import com.nethal.lab.ui.settings.SettingsScreen
-import com.nethal.lab.ui.settings.SettingsViewModel
 
 private object Routes {
     const val WELCOME = "welcome"
@@ -44,7 +42,10 @@ private object Routes {
     // ler capabilities exige sessão autenticada nesta implementação, então autenticar vem antes.
     const val CAPABILITIES = "capabilities"
     const val REPORT = "report"
-    const val SETTINGS = "settings"
+    // Host do "modo uso diário" (#67, ADR 0002 Fase 2) — `BottomNavHost`, com as abas Status,
+    // Rede, Dispositivos e Configurações. Substitui a antiga rota órfã `settings`: Configurações
+    // agora vive como aba dentro deste host, não como destino solto no funil de pareamento.
+    const val HOME = "home"
 }
 
 @Composable
@@ -185,16 +186,15 @@ fun NetHalNavHost(
                 viewModel = viewModel,
                 onFinish = {
                     resetDiagnosisState()
-                    navController.navigate(Routes.WELCOME) {
+                    navController.navigate(Routes.HOME) {
                         popUpTo(Routes.WELCOME) { inclusive = true }
                     }
                 },
             )
         }
 
-        composable(Routes.SETTINGS) {
-            val viewModel: SettingsViewModel = viewModel(factory = viewModelFactory)
-            SettingsScreen(viewModel = viewModel)
+        composable(Routes.HOME) {
+            BottomNavHost(viewModelFactory = viewModelFactory)
         }
     }
 }

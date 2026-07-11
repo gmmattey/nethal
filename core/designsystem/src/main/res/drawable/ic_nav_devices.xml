@@ -1,0 +1,29 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!--
+      Placeholder temporário para a aba Dispositivos — baseado em "router.svg" do design system
+      (docs/design/assets/icons). Nem "router.svg" nem "switch.svg" batem com o ícone do protótipo
+      (fluxo 3, telas 3i/3j, docs/design/prototypes.dc.html) — pendente de confirmação da Vera.
+      Ver nota em BottomNavHost.kt e no corpo do PR da issue #67.
+    -->
+    <path
+        android:pathData="M5,9 H19 A2,2 0 0,1 21,11 V15 A2,2 0 0,1 19,17 H5 A2,2 0 0,1 3,15 V11 A2,2 0 0,1 5,9 Z"
+        android:strokeColor="#8891A8"
+        android:strokeWidth="1.8"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M6.5,13a1,1 0 1,0 2,0a1,1 0 1,0 -2,0"
+        android:fillColor="#8891A8" />
+    <path
+        android:pathData="M10.5,13a1,1 0 1,0 2,0a1,1 0 1,0 -2,0"
+        android:fillColor="#8891A8" />
+    <path
+        android:pathData="M8,9V6M16,9V6"
+        android:strokeColor="#8891A8"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>

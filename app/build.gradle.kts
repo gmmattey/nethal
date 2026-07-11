@@ -51,6 +51,7 @@ dependencies {
     implementation(project(":core:discovery"))
     implementation(project(":core:fingerprint"))
     implementation(project(":core:capability"))
+    implementation(project(":core:navigation"))
     implementation(project(":core:designsystem"))
     implementation(project(":drivers:nokia-gpon"))
     implementation(project(":drivers:tplink-legacy-cgi"))
