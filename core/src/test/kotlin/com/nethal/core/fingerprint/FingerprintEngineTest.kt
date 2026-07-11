@@ -209,4 +209,33 @@ class FingerprintEngineTest {
         assertNull(result.vendor)
         assertEquals(0.0, result.confidence, 0.0)
     }
+
+    @Test
+    fun `tie between two real C6 profiles prefers the more mature stage over catalog order`() = runTest {
+        // Regressão da issue #45: tplink_archer_c6_v1 (DRAFT, driver que não lê nada) e
+        // tplink_archer_c6_stok_v1 (READ_ONLY_ALPHA, driver real) compartilham vendor/model e os
+        // mesmos candidateIps no catálogo real — sem evidência de header, o score empata em 0.30
+        // (endpoint canônico + presença no catálogo) para os dois. O engine precisa escolher o
+        // profile mais maduro, não o primeiro na ordem do array (que é o DRAFT).
+        val realManifestJson = loadEmbeddedCatalogResource()
+        val realManifest = kotlinx.serialization.json.Json.decodeFromString(CompatibilityManifest.serializer(), realManifestJson)
+        val draftProfile = realManifest.profiles.single { it.profileId == "tplink_archer_c6_v1" }
+        val stokProfile = realManifest.profiles.single { it.profileId == "tplink_archer_c6_stok_v1" }
+        assertEquals(DriverStage.DRAFT, draftProfile.stage)
+        assertEquals(DriverStage.READ_ONLY_ALPHA, stokProfile.stage)
+
+        val tieManifest = realManifest.copy(profiles = listOf(draftProfile, stokProfile))
+        val registry = DefaultDriverRegistry(embeddedManifestLoader = {
+            kotlinx.serialization.json.Json.encodeToString(CompatibilityManifest.serializer(), tieManifest)
+        })
+        val probe = object : HttpFingerprintProbe {
+            override suspend fun probe(ip: String, port: Int): HttpFingerprintEvidence? = null
+        }
+        val engine = DefaultFingerprintEngine(probe, registry)
+
+        val result = engine.identify(target("192.168.0.1"))
+
+        assertEquals(0.30, result.confidence, 0.0001)
+        assertEquals("tplink_archer_c6_stok_v1", result.matchedProfileId)
+    }
 }
