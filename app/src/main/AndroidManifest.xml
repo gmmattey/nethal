@@ -11,6 +11,11 @@
          — inclusive na LAN local (SSDP/UPnP do Discovery Engine, Feat 2/SIG-316-317). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Runtime prompt a partir da API 33 (Tiramisu) — solicitada na tela `1d` (Notificações,
+         issue #71), nunca no cold start. Abaixo da API 33 é concedida automaticamente na
+         instalação, sem prompt. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".NetHalApplication"
         android:allowBackup="false"

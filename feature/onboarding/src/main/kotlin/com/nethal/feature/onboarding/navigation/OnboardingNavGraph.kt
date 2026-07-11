@@ -4,21 +4,25 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.nethal.core.catalog.DriverRegistry
+import com.nethal.core.consent.ConsentRepository
 import com.nethal.feature.onboarding.OnboardingPermissionsState
 import com.nethal.feature.onboarding.ui.OnboardingCompatibleDevicesScreen
 import com.nethal.feature.onboarding.ui.OnboardingLocationScreen
 import com.nethal.feature.onboarding.ui.OnboardingNearbyDevicesScreen
+import com.nethal.feature.onboarding.ui.OnboardingNotificationsScreen
 import com.nethal.feature.onboarding.ui.OnboardingPermissionsSummaryScreen
+import com.nethal.feature.onboarding.ui.OnboardingWelcomeScreen
 
 /**
- * Rotas expostas por `:feature:onboarding`. Só as 4 telas desta entrega (#69/#70/#72/#73) — `1a`
- * (boas-vindas, issue #68) e `1d` (notificações, issue #71) não existem neste módulo ainda; o host
- * que consumir este grafo (unificação de NavHost, issue #113) é responsável por inseri-las na
- * sequência quando estiverem prontas.
+ * Rotas expostas por `:feature:onboarding`. As 6 telas do fluxo (#68/#69/#70/#71/#72/#73) — `1a`
+ * (boas-vindas) é a primeira da sequência, `1d` (notificações) fica entre `1c` e `1e`, igual ao
+ * protótipo (`1a`→`1b`→`1c`→`1d`→`1e`, `1f` acessível a partir de `1a`).
  */
 object OnboardingRoutes {
+    const val WELCOME = "onboarding/welcome" // 1a
     const val LOCATION = "onboarding/location" // 1b
     const val NEARBY_DEVICES = "onboarding/nearby-devices" // 1c
+    const val NOTIFICATIONS = "onboarding/notifications" // 1d
     const val PERMISSIONS_SUMMARY = "onboarding/permissions-summary" // 1e
     const val COMPATIBLE_DEVICES = "onboarding/compatible-devices" // 1f
 }
@@ -28,38 +32,71 @@ object OnboardingRoutes {
  * `:core:navigation` (`NavigationContracts.kt`) para o composition root (#67/#113) plugar sem
  * `:feature:onboarding` depender de nenhum outro módulo `:feature:*`.
  *
- * A sequência padrão ligada aqui é `1b`→`1c`→`1e` (pula `1d`, ainda não implementada — issue #71).
- * Quando `1d` existir, o host troca [onNearbyDevicesContinue] para navegar para a rota de `1d`
- * antes de `1e`, sem precisar mudar nada dentro deste módulo. `1f` não é sequencial (acessível a
+ * Sequência padrão ligada aqui: `1a`→`1b`→`1c`→`1d`→`1e`. `1f` não é sequencial (acessível a
  * partir de `1a` via link "Ver dispositivos compatíveis", como no protótipo) — por isso não tem
  * callback de "continue" próprio, só [onCompatibleDevicesBack].
  *
  * [onboardingPermissionsState] é lido (não observado como estado reativo do Compose) no momento em
  * que `1e` é composta — o host consulta o estado real das permissões do Android
- * (`ContextCompat.checkSelfPermission`) e devolve aqui; este módulo nunca solicita permissão.
+ * (`ContextCompat.checkSelfPermission`) e devolve aqui; `1b`/`1c` nunca solicitam permissão real
+ * (só `1d`, notificações, que solicita `POST_NOTIFICATIONS` diretamente).
+ *
+ * [consentRepository] é injetado direto nas telas que gravam consentimento (`1a` grava
+ * `NETWORK_AUTHORIZATION`/`READ_STATUS`; `1d` grava `TELEMETRY_BETA`) — mesmo padrão de injeção
+ * direta já usado para [driverRegistry] em `1f`, sem `ViewModel` neste módulo.
+ *
+ * [onViewPrivacy] é responsabilidade do host: destino real (item de Privacidade em Configurações,
+ * issue #85) ainda não existe neste módulo — decisão #66.
  */
 fun NavGraphBuilder.onboardingGraph(
     navController: NavHostController,
     driverRegistry: DriverRegistry,
+    consentRepository: ConsentRepository,
     onboardingPermissionsState: () -> OnboardingPermissionsState,
     onPermissionsSummaryContinue: () -> Unit,
+    onViewPrivacy: () -> Unit = {},
     onRecommendModel: () -> Unit = {},
+    onWelcomeContinue: () -> Unit = {
+        navController.navigate(OnboardingRoutes.LOCATION)
+    },
+    onViewCompatibleDevices: () -> Unit = {
+        navController.navigate(OnboardingRoutes.COMPATIBLE_DEVICES)
+    },
     onLocationContinue: () -> Unit = {
         navController.navigate(OnboardingRoutes.NEARBY_DEVICES)
     },
     onNearbyDevicesContinue: () -> Unit = {
+        navController.navigate(OnboardingRoutes.NOTIFICATIONS)
+    },
+    onNotificationsContinue: () -> Unit = {
         navController.navigate(OnboardingRoutes.PERMISSIONS_SUMMARY)
     },
     onCompatibleDevicesBack: () -> Unit = {
         navController.popBackStack()
     },
 ) {
+    composable(OnboardingRoutes.WELCOME) {
+        OnboardingWelcomeScreen(
+            consentRepository = consentRepository,
+            onStartDiagnosis = onWelcomeContinue,
+            onViewPrivacy = onViewPrivacy,
+            onViewCompatibleDevices = onViewCompatibleDevices,
+        )
+    }
+
     composable(OnboardingRoutes.LOCATION) {
         OnboardingLocationScreen(onContinue = onLocationContinue)
     }
 
     composable(OnboardingRoutes.NEARBY_DEVICES) {
         OnboardingNearbyDevicesScreen(onContinue = onNearbyDevicesContinue)
+    }
+
+    composable(OnboardingRoutes.NOTIFICATIONS) {
+        OnboardingNotificationsScreen(
+            consentRepository = consentRepository,
+            onContinue = onNotificationsContinue,
+        )
     }
 
     composable(OnboardingRoutes.PERMISSIONS_SUMMARY) {

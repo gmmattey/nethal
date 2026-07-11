@@ -16,9 +16,9 @@ import androidx.compose.ui.unit.dp
  * Indicador de progresso das telas sequenciais do onboarding (`1a`→`1b`→`1c`→`1d`→`1e`),
  * fiel ao protótipo: pill ativo 20×6dp accent, pontos inativos 6×6dp `#262F40`.
  *
- * [activeIndex] segue o próprio protótipo, não uma contagem linear de telas implementadas: `1e`
- * reaproveita o mesmo índice de `1d` (posição 3) porque as duas representam o mesmo passo visual
- * ("permissões", concluído) — `1d` (notificações) é a issue #71, fora do escopo deste módulo.
+ * [activeIndex] segue o próprio protótipo, não uma contagem linear de telas implementadas:
+ * `1a`=0, `1b`=1, `1c`=2, `1d`=3, e `1e` reaproveita o mesmo índice de `1d` (posição 3) porque as
+ * duas representam o mesmo passo visual ("permissões", concluído).
  */
 @Composable
 internal fun OnboardingProgressDots(

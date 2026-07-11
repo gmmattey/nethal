@@ -34,6 +34,7 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:catalog"))
+    implementation(project(":core:consent"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.material3)
@@ -41,6 +42,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.ktx)
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)

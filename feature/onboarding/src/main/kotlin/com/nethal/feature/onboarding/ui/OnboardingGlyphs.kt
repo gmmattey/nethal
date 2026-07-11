@@ -1,7 +1,12 @@
 package com.nethal.feature.onboarding.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -140,6 +145,75 @@ internal fun ChevronLeftGlyph(modifier: Modifier = Modifier, tint: Color = Onboa
             path = path,
             color = tint,
             style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round),
+        )
+    }
+}
+
+/**
+ * Marca NetHAL (tela 1a) — quadrado arredondado fill accent com quadrado interno menor na cor de
+ * fundo, replicando o hero do protótipo (`docs/design/prototypes.dc.html` `1a`: quadrado 76dp
+ * raio 22 fill `#006FFF` + quadrado interno 26dp raio 7 `#0B0F19`) e coerente com a marca oficial
+ * documentada na skill `/nethal-design` §Marca. Composição com [Box] (não [Canvas]) porque são só
+ * dois retângulos arredondados concêntricos, sem necessidade de path vetorial.
+ */
+@Composable
+internal fun NetHalMarkGlyph(modifier: Modifier = Modifier, tint: Color = OnboardingColors.Accent) {
+    Box(
+        modifier = modifier.background(tint, RoundedCornerShape(percent = 29)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize(0.34f)
+                .background(OnboardingColors.Background, RoundedCornerShape(percent = 27)),
+        )
+    }
+}
+
+/**
+ * Sino de notificação (tela 1d) — corpo em domo + badana + batente, replicando
+ * `docs/design/prototypes.dc.html` `1d` (path `M6 16V10a6 6 0 1112 0v6l2 3H4l2-3z` +
+ * `M9.5 20a2.5 2.5 0 005 0`) com formas primitivas, mesma filosofia dos demais glyphs deste
+ * arquivo.
+ */
+@Composable
+internal fun BellGlyph(modifier: Modifier = Modifier, tint: Color = OnboardingColors.Accent) {
+    Canvas(modifier = modifier) {
+        val strokeWidth = size.minDimension * 0.12f
+        val domeRadius = size.width * 0.32f
+        val domeCenterY = size.height * 0.40f
+        val bodyLeft = size.width * 0.5f - domeRadius
+        val bodyRight = size.width * 0.5f + domeRadius
+        val bodyBottom = size.height * 0.72f
+
+        val bodyPath = Path().apply {
+            moveTo(bodyLeft, bodyBottom)
+            arcTo(
+                rect = Rect(bodyLeft, domeCenterY - domeRadius, bodyRight, domeCenterY + domeRadius),
+                startAngleDegrees = 180f,
+                sweepAngleDegrees = 180f,
+                forceMoveTo = false,
+            )
+            lineTo(bodyRight, bodyBottom)
+            lineTo(size.width * 0.86f, size.height * 0.84f)
+            lineTo(size.width * 0.14f, size.height * 0.84f)
+            close()
+        }
+        drawPath(
+            path = bodyPath,
+            color = tint,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round),
+        )
+
+        val clapperSize = size.width * 0.22f
+        drawArc(
+            color = tint,
+            startAngle = 20f,
+            sweepAngle = 140f,
+            useCenter = false,
+            topLeft = Offset(size.width * 0.5f - clapperSize / 2f, size.height * 0.86f),
+            size = Size(clapperSize, clapperSize),
+            style = Stroke(width = strokeWidth * 0.85f, cap = StrokeCap.Round),
         )
     }
 }
