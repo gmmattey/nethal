@@ -37,6 +37,10 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":feature:tools-common"))
 
+    // Adapta o SpeedtestEngine (#98) ao mecanismo de medição periódica (#112) — reaproveita a
+    // capability já existente em vez de duplicar lógica de medição para o cenário recorrente.
+    implementation(project(":core:scheduling"))
+
     // Motor de speedtest (issue #98) — decisão registrada no PR: OkHttp em vez de transporte de
     // streaming próprio sobre HttpURLConnection. Escopado só a este módulo, não vira dependência de
     // :core:protocol (que é deliberadamente restrito a HttpURLConnection + guard de IP privado,
