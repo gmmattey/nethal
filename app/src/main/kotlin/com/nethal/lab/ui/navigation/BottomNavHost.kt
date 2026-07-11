@@ -23,6 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import com.nethal.core.capability.CapabilityEngine
 import com.nethal.core.designsystem.R
 import com.nethal.core.navigation.BottomNavDestination
+import com.nethal.core.telemetry.TelemetryCollector
 import com.nethal.feature.devices.devicesGraph
 import com.nethal.feature.settings.settingsGraph
 import com.nethal.feature.status.statusGraph
@@ -64,8 +65,13 @@ fun BottomNavHost(
     viewModelFactory: NetHalViewModelFactory,
     capabilityEngine: CapabilityEngine?,
     pairedDeviceIp: String?,
+    telemetryCollector: TelemetryCollector,
     navController: NavHostController = rememberNavController(),
 ) {
+    // `screen_view` (issue #97, Lane B) — grafo aninhado próprio (uso diário + ferramentas), separado
+    // do `NavHostController` raiz de `NetHalNavHost` (onboarding/pareamento).
+    TelemetryScreenViewReporter(navController = navController, telemetryCollector = telemetryCollector)
+
     Scaffold(
         bottomBar = {
             val backStackEntry by navController.currentBackStackEntryAsState()

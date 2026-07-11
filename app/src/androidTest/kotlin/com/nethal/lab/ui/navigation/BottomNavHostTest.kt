@@ -36,11 +36,13 @@ class BottomNavHostTest {
     @Before
     fun setUp() {
         val app = ApplicationProvider.getApplicationContext<NetHalApplication>()
+        // driverRegistry/driverFamilyRegistry removidos daqui: quebra pré-existente, não relacionada à
+        // #97 — `NetHalViewModelFactory` não aceita mais esses parâmetros desde 4fc6cd3 ("enxuga
+        // NetHalViewModelFactory", ADR 0002); este teste instrumentado nunca foi atualizado e não
+        // compilava. Corrigido no mesmo diff por estar editando este arquivo de qualquer forma.
         viewModelFactory = NetHalViewModelFactory(
             consentRepository = app.consentRepository,
             themeModeRepository = app.themeModeRepository,
-            driverRegistry = app.driverRegistry,
-            driverFamilyRegistry = app.driverFamilyRegistry,
         )
 
         composeRule.setContent {
@@ -49,6 +51,7 @@ class BottomNavHostTest {
                     viewModelFactory = viewModelFactory,
                     capabilityEngine = null,
                     pairedDeviceIp = null,
+                    telemetryCollector = app.telemetryCollector,
                 )
             }
         }
