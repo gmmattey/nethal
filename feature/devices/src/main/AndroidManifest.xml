@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Exigida por ConnectivityManager (leitura de LinkProperties/NetworkCapabilities em
+         AndroidLanNetworkEnvironmentReader) — mesma permissão já declarada em `:app`, mas cada
+         módulo declara as permissões que o próprio código usa (mescladas no manifest final). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Sockets crus (varredura ativa por sub-rede + SSDP via :core:discovery). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Nenhuma permissão de mDNS (`CHANGE_WIFI_MULTICAST_STATE`) — mDNS deliberadamente fora
+         de escopo nesta primeira versão (ver KDoc de DefaultLanDeviceScanner). -->
+
+</manifest>
