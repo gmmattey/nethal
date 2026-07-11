@@ -22,6 +22,23 @@ internal class FakeTpLinkLegacyCgiHttpTransport(
     private val expectedAuthorizationCookie: String? = null,
     private val responsesByRequestBody: Map<String, TplinkHttpResponse> = emptyMap(),
     private val defaultResponse: TplinkHttpResponse? = null,
+    /**
+     * Corpo de request usado pela validação de login ([TpLinkLegacyCgiAuthenticationClient.login],
+     * `config.loginValidationSections()`) — necessário só quando [expireAfterCallCount] está em uso,
+     * para o fake saber reconhecer "isto é um (re)login", já que este protocolo não tem endpoint de
+     * login dedicado (login = a mesma leitura autenticada de sempre, distinguida só pelo corpo).
+     */
+    private val loginRequestBody: String? = null,
+    /**
+     * Simula sessão/credencial expirando entre chamadas (issue #19,
+     * [TpLinkLegacyCgiAuthenticationClient.fetchAuthenticated]): a partir da
+     * (`expireAfterCallCount + 1`)-ésima leitura autenticada feita sob o mesmo (re)login (contando só
+     * chamadas cujo corpo é diferente de [loginRequestBody]), o "servidor" fake responde HTTP 401 —
+     * até o próximo `post()` com corpo igual a [loginRequestBody], que reseta a contagem. Mesmo
+     * mecanismo de `FakeTpLinkStokLuciHttpTransport.expireAuthenticatedReadsAfter`. `null` (default)
+     * desliga a simulação.
+     */
+    private val expireAfterCallCount: Int? = null,
 ) : TplinkHttpTransport {
 
     var getCallCount = 0
@@ -32,6 +49,7 @@ internal class FakeTpLinkLegacyCgiHttpTransport(
         private set
     var lastCookieHeaderSent: String? = null
         private set
+    private var authenticatedReadCountSinceLogin = 0
 
     override fun get(url: String, extraHeaders: Map<String, String>): TplinkHttpResponse {
         getCallCount++
@@ -46,6 +64,16 @@ internal class FakeTpLinkLegacyCgiHttpTransport(
 
         if (expectedAuthorizationCookie != null && cookieValue != expectedAuthorizationCookie) {
             return TplinkHttpResponse(401, "", emptyMap(), emptyMap())
+        }
+
+        if (loginRequestBody != null && body == loginRequestBody) {
+            authenticatedReadCountSinceLogin = 0
+        } else {
+            authenticatedReadCountSinceLogin++
+            val expireAfter = expireAfterCallCount
+            if (expireAfter != null && authenticatedReadCountSinceLogin > expireAfter) {
+                return TplinkHttpResponse(401, "", emptyMap(), emptyMap())
+            }
         }
 
         return responsesByRequestBody[body]

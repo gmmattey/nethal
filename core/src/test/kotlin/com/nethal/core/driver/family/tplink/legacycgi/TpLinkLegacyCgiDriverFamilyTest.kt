@@ -110,7 +110,7 @@ class TpLinkLegacyCgiDriverFamilyTest {
         assertEquals(2, snapshot.wifi.size)
         assertEquals("Casa-2.4G", snapshot.wifi[0].ssid)
         assertEquals(1, snapshot.connectedClients.size)
-        assertEquals("AA:BB:CC:**:**:**", snapshot.connectedClients.first().macAddressMasked)
+        assertEquals("AA:BB:CC:DD:EE:FF", snapshot.connectedClients.first().macAddress)
     }
 
     @Test
@@ -155,5 +155,117 @@ class TpLinkLegacyCgiDriverFamilyTest {
         val result = driver.readCapability(com.nethal.core.model.CapabilityId.READ_WAN_STATUS)
 
         assertTrue(result is com.nethal.core.catalog.CapabilityReadResult.Unavailable)
+    }
+
+    @Test
+    fun `readCapability without a prior authenticate() call always returns Unavailable`() = runTest {
+        val transport = FakeTpLinkLegacyCgiHttpTransport()
+        val driver = TpLinkLegacyCgiDriverFamily("192.168.0.1", realProfileConfig(), transport)
+
+        val result = driver.readCapability(com.nethal.core.model.CapabilityId.READ_DEVICE_INFO)
+
+        assertTrue(result is com.nethal.core.catalog.CapabilityReadResult.Unavailable)
+        assertEquals(0, transport.postCallCount)
+    }
+
+    @Test
+    fun `readCapability distinguishes unsupported capability from supported-but-sessionless in the reason`() = runTest {
+        val transport = FakeTpLinkLegacyCgiHttpTransport()
+        val driver = TpLinkLegacyCgiDriverFamily("192.168.0.1", realProfileConfig(), transport)
+
+        val unsupported = driver.readCapability(com.nethal.core.model.CapabilityId.READ_WAN_STATUS)
+            as com.nethal.core.catalog.CapabilityReadResult.Unavailable
+        assertTrue(unsupported.reason.contains("não implementa leitura"))
+
+        val supportedButSessionless = driver.readCapability(com.nethal.core.model.CapabilityId.READ_WIFI_STATUS)
+            as com.nethal.core.catalog.CapabilityReadResult.Unavailable
+        assertTrue(supportedButSessionless.reason.contains("authenticate"))
+    }
+
+    @Test
+    fun `authenticate succeeds against a well-formed fake response and caches the session for readCapability`() = runTest {
+        val config = realProfileConfig()
+        val transport = FakeTpLinkLegacyCgiHttpTransport(
+            expectedAuthorizationCookie = basicCookie("admin", "secret"),
+            responsesByRequestBody = responsesForSuccessfulSnapshot(config),
+        )
+        val driver = TpLinkLegacyCgiDriverFamily("192.168.0.1", config, transport, backoffMillis = { 0L })
+
+        val authResult = driver.authenticate("admin", "secret")
+
+        assertTrue(authResult is com.nethal.core.catalog.DriverFamilyAuthResult.Success)
+        assertEquals(1, transport.postCallCount) // authenticate() faz só a leitura de validação, sem ler wifi/clients ainda
+
+        val deviceInfo = driver.readCapability(com.nethal.core.model.CapabilityId.READ_DEVICE_INFO)
+        assertTrue(deviceInfo is com.nethal.core.catalog.CapabilityReadResult.Success)
+        val deviceInfoPayload = (deviceInfo as com.nethal.core.catalog.CapabilityReadResult.Success).payload
+            as com.nethal.core.model.CapabilityPayload.DeviceInfo
+        assertEquals("TP-Link", deviceInfoPayload.info.vendor)
+        assertEquals("Archer C20", deviceInfoPayload.info.model)
+
+        val wifi = driver.readCapability(com.nethal.core.model.CapabilityId.READ_WIFI_STATUS)
+        assertTrue(wifi is com.nethal.core.catalog.CapabilityReadResult.Success)
+        val wifiPayload = (wifi as com.nethal.core.catalog.CapabilityReadResult.Success).payload as com.nethal.core.model.CapabilityPayload.Wifi
+        assertEquals(2, wifiPayload.status.radios.size)
+        assertEquals("Casa-2.4G", wifiPayload.status.radios[0].ssid)
+
+        val clients = driver.readCapability(com.nethal.core.model.CapabilityId.READ_CONNECTED_CLIENTS)
+        assertTrue(clients is com.nethal.core.catalog.CapabilityReadResult.Success)
+        val clientsPayload = (clients as com.nethal.core.catalog.CapabilityReadResult.Success).payload
+            as com.nethal.core.model.CapabilityPayload.ConnectedClients
+        assertEquals(1, clientsPayload.clients.clients.size)
+        assertEquals("AA:BB:CC:DD:EE:FF", clientsPayload.clients.clients.first().macAddress)
+
+        // authenticate (1) + 3 leituras por-capability (1 cada) = 4, nenhum novo login.
+        assertEquals(4, transport.postCallCount)
+    }
+
+    @Test
+    fun `authenticate fails fast on invalid credentials and never caches a session`() = runTest {
+        val config = realProfileConfig()
+        val transport = FakeTpLinkLegacyCgiHttpTransport(
+            expectedAuthorizationCookie = basicCookie("admin", "correct-password"),
+            responsesByRequestBody = responsesForSuccessfulSnapshot(config),
+        )
+        val driver = TpLinkLegacyCgiDriverFamily("192.168.0.1", config, transport, maxAttempts = 2, backoffMillis = { 0L })
+
+        val authResult = driver.authenticate("admin", "wrong")
+
+        assertTrue(authResult is com.nethal.core.catalog.DriverFamilyAuthResult.InvalidCredentials)
+        assertEquals(1, transport.postCallCount) // sem retry para credencial invalida
+
+        val readAfterFailedAuth = driver.readCapability(com.nethal.core.model.CapabilityId.READ_DEVICE_INFO)
+        assertTrue(readAfterFailedAuth is com.nethal.core.catalog.CapabilityReadResult.Unavailable)
+    }
+
+    @Test
+    fun `readCapability surfaces SessionExpired when a cached session stops being accepted mid-flow`() = runTest {
+        val config = realProfileConfig()
+        val transport = FakeTpLinkLegacyCgiHttpTransport(
+            expectedAuthorizationCookie = basicCookie("admin", "secret"),
+            responsesByRequestBody = responsesForSuccessfulSnapshot(config),
+            loginRequestBody = TpLinkLegacyCgiResponseParser.buildRequestBody(config.loginValidationSections()),
+            expireAfterCallCount = 0, // login passa; qualquer leitura autenticada seguinte já expira
+        )
+        val driver = TpLinkLegacyCgiDriverFamily("192.168.0.1", config, transport, backoffMillis = { 0L })
+
+        val authResult = driver.authenticate("admin", "secret")
+        assertTrue(authResult is com.nethal.core.catalog.DriverFamilyAuthResult.Success)
+
+        val result = driver.readCapability(com.nethal.core.model.CapabilityId.READ_WIFI_STATUS)
+
+        assertTrue(result is com.nethal.core.catalog.CapabilityReadResult.SessionExpired)
+    }
+
+    @Test
+    fun `SUPPORTED_CAPABILITIES covers only capabilities with real structured parsing`() {
+        assertEquals(
+            setOf(
+                com.nethal.core.model.CapabilityId.READ_DEVICE_INFO,
+                com.nethal.core.model.CapabilityId.READ_WIFI_STATUS,
+                com.nethal.core.model.CapabilityId.READ_CONNECTED_CLIENTS,
+            ),
+            TpLinkLegacyCgiDriverFamily.SUPPORTED_CAPABILITIES,
+        )
     }
 }

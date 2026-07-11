@@ -181,16 +181,9 @@ internal object TpLinkLegacyCgiResponseParser {
             TpLinkLegacyCgiConnectedClient(
                 hostname = fields["hostName"].orEmpty(),
                 ipAddress = ipAddress,
-                macAddressMasked = maskMac(fields["MACAddress"].orEmpty()),
+                macAddress = fields["MACAddress"].orEmpty(),
                 leaseTimeRemainingSeconds = fields["leaseTimeRemaining"]?.toLongOrNull(),
             )
         }
-    }
-
-    /** Mascara os 3 últimos octetos do MAC (mantém só o OUI/fabricante) — mesma regra de telemetria sanitizada de todo o NetHAL. */
-    private fun maskMac(mac: String): String {
-        val parts = mac.split(":", "-")
-        if (parts.size != 6) return "**:**:**:**:**:**"
-        return "${parts[0]}:${parts[1]}:${parts[2]}:**:**:**"
     }
 }

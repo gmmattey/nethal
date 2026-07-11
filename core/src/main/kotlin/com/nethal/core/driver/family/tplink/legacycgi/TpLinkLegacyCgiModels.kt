@@ -31,11 +31,16 @@ data class TpLinkLegacyCgiWifiStatus(
     val ssid: String,
 )
 
-/** Um cliente DHCP conectado — seção configurável via `driverConfig` (tipicamente LAN_HOST_ENTRY). MAC sempre mascarado antes de sair do parser. */
+/**
+ * Um cliente DHCP conectado — seção configurável via `driverConfig` (tipicamente LAN_HOST_ENTRY).
+ * MAC bruto (ADR 0001, `docs/architecture/adr/0001-fronteira-sanitizacao-telemetria.md`):
+ * mascaramento é responsabilidade exclusiva de um futuro Telemetry Collector, aplicada só na
+ * fronteira de exportação — nunca no modelo de dados local.
+ */
 data class TpLinkLegacyCgiConnectedClient(
     val hostname: String,
     val ipAddress: String,
-    val macAddressMasked: String,
+    val macAddress: String,
     val leaseTimeRemainingSeconds: Long?,
 )
 

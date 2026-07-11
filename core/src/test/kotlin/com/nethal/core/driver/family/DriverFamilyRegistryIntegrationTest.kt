@@ -126,7 +126,7 @@ class DriverFamilyRegistryIntegrationTest {
         assertEquals(1, snapshot.wifi.size)
         assertEquals("Casa-2.4G", snapshot.wifi.first().ssid)
         assertEquals(1, snapshot.connectedClients.size)
-        assertEquals("AA:BB:CC:**:**:**", snapshot.connectedClients.first().macAddressMasked)
+        assertEquals("AA:BB:CC:DD:EE:FF", snapshot.connectedClients.first().macAddress)
         assertTrue("transporte recebido pela factory deveria ter sido de fato usado", transport.postCallCount > 0)
     }
 

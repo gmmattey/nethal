@@ -114,7 +114,7 @@ class TpLinkLegacyCgiResponseParserTest {
     }
 
     @Test
-    fun `parseConnectedClients extracts fields and masks MAC address to OUI only`() {
+    fun `parseConnectedClients extracts fields including the raw MAC address`() {
         val body = lanHostEntryResponse().body
 
         val clients = TpLinkLegacyCgiResponseParser.parseConnectedClients(body, lanHostEntryIndex = 0)
@@ -123,17 +123,17 @@ class TpLinkLegacyCgiResponseParserTest {
         val client = clients.first()
         assertEquals("Notebook-Teste", client.hostname)
         assertEquals("192.168.0.100", client.ipAddress)
-        assertEquals("AA:BB:CC:**:**:**", client.macAddressMasked)
+        assertEquals("AA:BB:CC:DD:EE:FF", client.macAddress)
         assertEquals(6231L, client.leaseTimeRemainingSeconds)
     }
 
     @Test
-    fun `parseConnectedClients never leaks full MAC even with malformed input`() {
+    fun `parseConnectedClients is defensive with malformed MAC input, never throws`() {
         val body = "[1,0,0,0,0,0]0\nMACAddress=not-a-real-mac\nhostName=x\nIPAddress=192.168.0.30\n[error]0"
 
         val clients = TpLinkLegacyCgiResponseParser.parseConnectedClients(body, lanHostEntryIndex = 0)
 
-        assertEquals("**:**:**:**:**:**", clients.first().macAddressMasked)
+        assertEquals("not-a-real-mac", clients.first().macAddress)
     }
 
     @Test
