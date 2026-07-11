@@ -28,4 +28,14 @@ internal object TpLinkXdrDsResponseParser {
         return root["stok"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
     }
 
+    /**
+     * `error_code` do envelope JSON de resposta — único campo confirmado em toda a superfície de
+     * `/ds` até aqui (usado tanto no probe `get_encrypt_info` quanto, por convenção do próprio
+     * dispatcher, no corpo de qualquer leitura). `null` quando o corpo não é JSON válido ou não tem
+     * o campo — nunca lança.
+     */
+    fun parseErrorCode(body: String): Int? {
+        val root = runCatching { json.parseToJsonElement(body) }.getOrNull() as? JsonObject ?: return null
+        return (root["error_code"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
+    }
 }
