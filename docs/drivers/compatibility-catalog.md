@@ -329,6 +329,61 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
 
 ## Changelog
 
+- **2026-07-11 (Bruno — `REBOOT_DEVICE` no `tplink-stok-luci`, primeira capability de ação/escrita
+  "genérica" do produto, issues #95/#103)** — Novo manifesto `catalog-2026.07.29.json`
+  (`previousManifest: catalog-2026.07.28.json`).
+
+  **Backend (#103):** `DriverFamily` (`:core:catalog`) ganha `executeAction(id): CapabilityActionResult`
+  (default honesto `Unavailable`, mesmo espírito de `authenticate`) e `CapabilityEngine`
+  (`:core:capability`) ganha `executeAction(id)` reaproveitando a MESMA política de sessão
+  lazy/renovação de `readCapability` (nenhuma lógica de sessão duplicada). `REBOOT_DEVICE` já
+  existia no vocabulário oficial (`CapabilityId`) — não foi criada capability nova; decisão
+  registrada no KDoc de `CapabilityId.REBOOT_DEVICE` de reaproveitar este nome em vez de inventar
+  `REBOOT_WAN`, porque nenhum protocolo mapeado até aqui tem reinício seletivo de interface — todo
+  roteador doméstico reinicia o equipamento inteiro. `TpLinkStokLuciDriverFamily.executeAction`
+  implementa só `REBOOT_DEVICE`, via um único `operation=write` autenticado em
+  `admin/system?form=reboot` (`config.rebootPath`/`rebootQuery`, campos novos do `driverConfig`),
+  reaproveitando a sessão já aberta (`authenticatedClient`) — **sem retry automático de propósito**
+  (reenviar uma ação que muda o estado do equipamento arriscaria disparar dois reboots reais por
+  uma falha só de leitura da resposta).
+
+  **Restrição de driver (decisão de produto do Rafael/Luiz, não técnica):** `REBOOT_DEVICE` só
+  executa no driver TP-Link Archer C6 (`tplink-stok-luci`) — nunca no Archer C20
+  (`tplink-legacy-cgi`) nem no Nokia G-1425G-B (`nokia-gpon`), mesmo que `DriverFamily.executeAction`
+  permitisse tecnicamente nos três. A restrição é estrutural (nenhuma outra Driver Family deste
+  repositório sobrescreve o método, então a implementação default `Unavailable` é tudo o que os
+  outros dois expõem) — nunca um `if (vendor == ...)` em código compartilhado do Core. Testes
+  dedicados em `TpLinkLegacyCgiDriverFamilyTest`/`NokiaGponDriverFamilyTest` confirmam essa
+  restrição explicitamente.
+
+  **UI (#95):** módulo novo `:feature:tools-reboot-wan` — `RebootWanScreen`/`RebootWanViewModel`
+  implementam o protótipo `4h` (diálogo de confirmação, design system seção 1n): estado inicial
+  `ConfirmationPending` exibe o diálogo automaticamente assim que há sessão; `confirmReboot()` é o
+  ÚNICO caminho até `CapabilityEngine.executeAction(REBOOT_DEVICE)`, disparado exclusivamente pelo
+  toque explícito em "Reiniciar" — cancelar (toque em "Cancelar", tocar fora ou voltar) nunca chega
+  a chamar o Core. Cor de "Reiniciar" é `colorScheme.primary` (destaque), não a cor de erro — reboot
+  não apaga dado, mesma regra do design system (seção 1n: "cor de erro só se a ação apagar dados").
+  Não conectado a `SettingsScreen`/`BottomNavHost` nem ao Hub de Ferramentas (`:feature:tools-common`,
+  issue #89, também não conectado ainda) — pendência registrada para quando esse hub existir.
+
+  **Validação: só fake de transporte (JVM), nenhum reboot real disparado contra o hardware do
+  Luiz.** A regressão de sessão HTTP 403 documentada na entrada `2026-07-11` abaixo (issue #125,
+  investigação em paralelo) já bloqueava qualquer leitura autenticada real desta plataforma antes
+  desta rodada começar — capability entra `EXPERIMENTAL` no catálogo por esse motivo (endpoint
+  assumido por analogia com a convenção `admin/<seção>?form=<ação>` já confirmada ao vivo para as
+  demais leituras deste profile, sem confirmação por evidência ao vivo própria), não por dúvida
+  sobre a restrição de driver. Validação real fica para o Luiz, manualmente, depois de #125
+  resolvida.
+
+  `capabilities[]` do profile `tplink_archer_c6_stok_v1` — `REBOOT_DEVICE` sobe de `UNKNOWN` para
+  `EXPERIMENTAL`. `driverConfig` ganha `rebootPath`/`rebootQuery`. `confidenceScoreOverall`
+  inalterado (0.65) — a implementação de uma ação nova sem validação ao vivo não muda a heurística
+  de confiança de fingerprint/leitura já calculada na entrada `2026-07-11` abaixo.
+
+  Revisão de segurança da Marisa pendente antes de sair de `EXPERIMENTAL` (`/ciclo-vida-driver`) —
+  primeira capability de ação "genérica" do produto, fluxo de confirmação revisado com atenção
+  redobrada conforme pedido explícito da tarefa.
+
 - **2026-07-11 (Bruno — Feat #27: `READ_OPTICAL_SIGNAL_MARGIN`/`READ_GPON_ERROR_COUNTERS`/
   `READ_LAN_PORT_STATUS` no driver Nokia, issues #28/#29/#30)** — Três novos campos/capabilities do
   levantamento de campo `NOKIA_GPON_FIELD_MAP.md` (produto irmão SignallQ), itens 1-3 da seção
