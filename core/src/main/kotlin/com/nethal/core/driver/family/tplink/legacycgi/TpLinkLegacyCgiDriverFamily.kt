@@ -3,6 +3,7 @@ package com.nethal.core.driver.family.tplink.legacycgi
 import com.nethal.core.catalog.CapabilityReadResult
 import com.nethal.core.catalog.CompatibilityProfile
 import com.nethal.core.catalog.DriverFamily
+import com.nethal.core.catalog.DriverFamilyAuthResult
 import com.nethal.core.catalog.DriverFamilyFactory
 import com.nethal.core.discovery.PrivateIpRanges
 import com.nethal.core.driver.NetworkFailureReason
@@ -11,10 +12,20 @@ import com.nethal.core.driver.classifyNetworkFailure
 import com.nethal.core.driver.executeWithRetry
 import com.nethal.core.driver.tplink.DefaultTplinkHttpTransport
 import com.nethal.core.driver.tplink.TplinkHttpTransport
+import com.nethal.core.model.Capability
 import com.nethal.core.model.CapabilityId
+import com.nethal.core.model.CapabilityPayload
+import com.nethal.core.model.CapabilityState
+import com.nethal.core.model.ConnectedClient
+import com.nethal.core.model.ConnectedClientList
+import com.nethal.core.model.DeviceInfo
+import com.nethal.core.model.WifiBand
+import com.nethal.core.model.WifiRadio
+import com.nethal.core.model.WifiStatus
 import com.nethal.core.protocol.http.HttpTransport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 /** Motivo de falha da Driver Family após esgotar as tentativas — vocabulário para a UI decidir a mensagem. */
 internal enum class TpLinkLegacyCgiFailureReason {
@@ -98,7 +109,13 @@ internal class TpLinkLegacyCgiDriverFamily(
             onLoginFailure = { e ->
                 when (e.reason) {
                     TpLinkLegacyCgiLoginFailureReason.INVALID_CREDENTIALS -> TpLinkLegacyCgiFailureReason.INVALID_CREDENTIALS
-                    TpLinkLegacyCgiLoginFailureReason.UNEXPECTED_RESPONSE, TpLinkLegacyCgiLoginFailureReason.UNKNOWN -> null
+                    TpLinkLegacyCgiLoginFailureReason.UNEXPECTED_RESPONSE,
+                    TpLinkLegacyCgiLoginFailureReason.UNKNOWN,
+                    // SESSION_EXPIRED só é lançado por fetchAuthenticated (nunca por login() em si), mas o
+                    // enum é compartilhado entre os dois — mesmo raciocínio de UNEXPECTED_RESPONSE: tenta
+                    // login+leitura completos de novo.
+                    TpLinkLegacyCgiLoginFailureReason.SESSION_EXPIRED,
+                    -> null
                 }
             },
             classifyFinalFailure = ::classifyFailure,
@@ -140,14 +157,69 @@ internal class TpLinkLegacyCgiDriverFamily(
     }
 
     /**
-     * Implementação de [DriverFamily.readCapability] — prova que a resolução via
-     * `DriverFamilyRegistry` produz uma instância funcional (passo 4 do plano de refatoração).
+     * Client autenticado da sessão atual, preenchido por [authenticate] — `null` até a primeira
+     * autenticação bem-sucedida (via [com.nethal.core.capability.CapabilityEngine]) ou depois de uma
+     * renovação que falhou. Mesmo desenho de `TpLinkStokLuciDriverFamily.authenticatedClient`: é aqui
+     * que o único material de sessão deste protocolo (o cookie `Authorization` Basic Auth) vive.
+     */
+    private var authenticatedClient: TpLinkLegacyCgiAuthenticationClient? = null
+
+    /**
+     * Implementação de [DriverFamily.authenticate] — issue #19. Faz o mesmo handshake de
+     * [readSnapshot] (aqui não existe endpoint de login dedicado; "autenticar" é validar a credencial
+     * com a mesma primeira leitura real de sempre, ver KDoc de [TpLinkLegacyCgiAuthenticationClient]),
+     * mas guarda o client resultante em [authenticatedClient] em vez de descartá-lo, para
+     * [readCapability] reaproveitar a sessão entre chamadas. Chamar de novo (renovação) sempre
+     * substitui o client anterior, mesmo em caso de falha.
+     */
+    override suspend fun authenticate(username: String, password: String): DriverFamilyAuthResult = withContext(Dispatchers.IO) {
+        val outcome = executeWithRetry(
+            maxAttempts = maxAttempts,
+            backoffMillis = backoffMillis,
+            loginExceptionType = TpLinkLegacyCgiLoginException::class.java,
+            onLoginFailure = { e ->
+                when (e.reason) {
+                    TpLinkLegacyCgiLoginFailureReason.INVALID_CREDENTIALS -> TpLinkLegacyCgiFailureReason.INVALID_CREDENTIALS
+                    TpLinkLegacyCgiLoginFailureReason.UNEXPECTED_RESPONSE,
+                    TpLinkLegacyCgiLoginFailureReason.UNKNOWN,
+                    TpLinkLegacyCgiLoginFailureReason.SESSION_EXPIRED,
+                    -> null
+                }
+            },
+            classifyFinalFailure = ::classifyFailure,
+        ) {
+            val client = TpLinkLegacyCgiAuthenticationClient(host, transport, config.loginValidationSections())
+            client.login(username, password)
+            client
+        }
+
+        when (outcome) {
+            is RetryOutcome.Success -> {
+                authenticatedClient = outcome.value
+                DriverFamilyAuthResult.Success
+            }
+            is RetryOutcome.Failure -> {
+                authenticatedClient = null
+                val message = outcome.error.message ?: outcome.error.toString()
+                if (outcome.reason == TpLinkLegacyCgiFailureReason.INVALID_CREDENTIALS) {
+                    DriverFamilyAuthResult.InvalidCredentials(message)
+                } else {
+                    DriverFamilyAuthResult.Failure(message)
+                }
+            }
+        }
+    }
+
+    /**
+     * Implementação de [DriverFamily.readCapability] — issue #19. Usa a sessão de
+     * [authenticatedClient] (preenchida por [authenticate]) em vez de sempre devolver
+     * [CapabilityReadResult.Unavailable]. Diferente de `TpLinkStokLuciDriverFamily` (um único
+     * endpoint devolve tudo), este protocolo tem um bundle `/cgi` dedicado por capability — cada
+     * leitura busca só o bundle de que precisa, mesma separação já usada por [readSnapshot].
      *
-     * Esta rodada não tem credencial de sessão disponível no momento da chamada (o Capability
-     * Engine que vai gerenciar isso ainda não existe, ver `hal-layering-model.md` §8 passo 5) — por
-     * isso, sem uma sessão já autenticada, a única resposta honesta é [CapabilityReadResult.Unavailable].
-     * Quem precisa do snapshot real hoje (`ManualCheckRunnerC20`, testes) chama [readSnapshot]
-     * diretamente com a credencial da sessão local, exatamente como antes.
+     * HTTP 401/403 numa leitura autenticada vira [CapabilityReadResult.SessionExpired] (ver
+     * [TpLinkLegacyCgiLoginFailureReason.SESSION_EXPIRED] em [TpLinkLegacyCgiAuthenticationClient.fetchAuthenticated]).
+     * Qualquer outra falha de rede/protocolo vira [CapabilityReadResult.Failure].
      */
     override suspend fun readCapability(id: CapabilityId): CapabilityReadResult {
         if (id !in SUPPORTED_CAPABILITIES) {
@@ -155,12 +227,99 @@ internal class TpLinkLegacyCgiDriverFamily(
                 reason = "TpLinkLegacyCgiDriverFamily não implementa leitura para $id nesta rodada.",
             )
         }
-        return CapabilityReadResult.Unavailable(
-            reason = "Leitura de $id exige uma sessão autenticada (usuário/senha informados pelo usuário na sessão " +
-                "local) — ainda não há Capability Engine gerenciando essa sessão neste passo. Use readSnapshot() " +
-                "diretamente com a credencial da sessão local.",
+        val client = authenticatedClient
+            ?: return CapabilityReadResult.Unavailable(
+                reason = "Leitura de $id exige sessão autenticada — chame authenticate(username, password) " +
+                    "(via CapabilityEngine) antes de ler capabilities.",
+            )
+
+        return withContext(Dispatchers.IO) {
+            try {
+                when (id) {
+                    CapabilityId.READ_DEVICE_INFO -> {
+                        val body = client.fetchAuthenticated(TpLinkLegacyCgiResponseParser.buildRequestBody(config.loginValidationSections()))
+                        deviceInfoResultFor(
+                            TpLinkLegacyCgiResponseParser.parseDeviceInfo(
+                                body,
+                                deviceInfoIndex = config.deviceInfoIndex,
+                                ethSwitchIndex = config.ethSwitchIndex,
+                                sysModeIndex = config.sysModeIndex,
+                            ),
+                        )
+                    }
+                    CapabilityId.READ_WIFI_STATUS -> {
+                        val body = client.fetchAuthenticated(TpLinkLegacyCgiResponseParser.buildRequestBody(config.wifiStatusSections()))
+                        wifiResultFor(TpLinkLegacyCgiResponseParser.parseWifiStatus(body, lanWlanIndex = config.wifiStatusIndex))
+                    }
+                    CapabilityId.READ_CONNECTED_CLIENTS -> {
+                        val body = client.fetchAuthenticated(TpLinkLegacyCgiResponseParser.buildRequestBody(config.connectedClientsSections()))
+                        connectedClientsResultFor(
+                            TpLinkLegacyCgiResponseParser.parseConnectedClients(body, lanHostEntryIndex = config.connectedClientsIndex),
+                        )
+                    }
+                    else -> CapabilityReadResult.Unavailable(
+                        reason = "TpLinkLegacyCgiDriverFamily não implementa leitura para $id nesta rodada.",
+                    )
+                }
+            } catch (e: TpLinkLegacyCgiLoginException) {
+                if (e.reason == TpLinkLegacyCgiLoginFailureReason.SESSION_EXPIRED) {
+                    CapabilityReadResult.SessionExpired(reason = e.message ?: "sessão expirada ao ler $id")
+                } else {
+                    CapabilityReadResult.Failure(reason = e.message ?: "falha inesperada ao ler $id", cause = e)
+                }
+            } catch (e: IOException) {
+                CapabilityReadResult.Failure(reason = e.message ?: "falha de rede ao ler $id", cause = e)
+            }
+        }
+    }
+
+    /**
+     * Traduz [TpLinkLegacyCgiDeviceInfo] (já parseado) para o vocabulário público de capabilities.
+     * `vendor = "TP-Link"` é um fato conhecido desta plataforma (todo profile registrado sob
+     * `tplink-legacy-cgi-driver` é um equipamento TP-Link), não uma inferência de dado nem um
+     * `if (vendor == ...)` — o protocolo em si não expõe campo de fabricante. `firmware`/
+     * `hardwareVersion`/`serialNumberHash`/`uptimeSeconds`/`deviceType` ficam `null`: nenhum desses
+     * campos apareceu na captura real (SIG-337/SIG-338) do bundle IGD_DEV_INFO+ETH_SWITCH+SYS_MODE.
+     */
+    private fun deviceInfoResultFor(deviceInfo: TpLinkLegacyCgiDeviceInfo?): CapabilityReadResult {
+        if (deviceInfo == null) {
+            return CapabilityReadResult.Unavailable(reason = "Nenhuma seção de device info interpretada na resposta do equipamento.")
+        }
+        return CapabilityReadResult.Success(
+            capability = Capability(id = CapabilityId.READ_DEVICE_INFO, state = CapabilityState.AVAILABLE, confidence = 1.0),
+            payload = CapabilityPayload.DeviceInfo(
+                DeviceInfo(vendor = "TP-Link", model = deviceInfo.modelName),
+            ),
         )
     }
+
+    /** `band` fica sempre [WifiBand.UNKNOWN]: a seção `LAN_WLAN` só expõe `name`/`SSID`, sem campo de banda. */
+    private fun wifiResultFor(radios: List<TpLinkLegacyCgiWifiStatus>): CapabilityReadResult {
+        if (radios.isEmpty()) {
+            return CapabilityReadResult.Unavailable(reason = "Nenhum rádio Wi-Fi interpretado na resposta do equipamento.")
+        }
+        return CapabilityReadResult.Success(
+            capability = Capability(id = CapabilityId.READ_WIFI_STATUS, state = CapabilityState.AVAILABLE, confidence = 1.0),
+            payload = CapabilityPayload.Wifi(
+                WifiStatus(
+                    radios = radios.map { radio -> WifiRadio(id = radio.name, band = WifiBand.UNKNOWN, ssid = radio.ssid) },
+                ),
+            ),
+        )
+    }
+
+    /** Lista vazia é dado real ("nenhum cliente conectado agora"), não ausência de dado — sempre Success, mesma regra de `TpLinkStokLuciDriverFamily`. */
+    private fun connectedClientsResultFor(clients: List<TpLinkLegacyCgiConnectedClient>): CapabilityReadResult =
+        CapabilityReadResult.Success(
+            capability = Capability(id = CapabilityId.READ_CONNECTED_CLIENTS, state = CapabilityState.AVAILABLE, confidence = 1.0),
+            payload = CapabilityPayload.ConnectedClients(
+                ConnectedClientList(
+                    clients = clients.map { client ->
+                        ConnectedClient(hostname = client.hostname, ipAddress = client.ipAddress, macAddress = client.macAddressMasked)
+                    },
+                ),
+            ),
+        )
 
     private fun classifyFailure(error: Throwable): TpLinkLegacyCgiFailureReason = when (classifyNetworkFailure(error)) {
         NetworkFailureReason.DEVICE_UNREACHABLE -> TpLinkLegacyCgiFailureReason.DEVICE_UNREACHABLE
