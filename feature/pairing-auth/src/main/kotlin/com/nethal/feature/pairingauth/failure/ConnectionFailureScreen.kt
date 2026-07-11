@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -57,11 +58,11 @@ fun ConnectionFailureScreen(
     onRetry: () -> Unit,
     onFindPassword: () -> Unit,
 ) {
-    Scaffold(containerColor = BackgroundDark) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(BackgroundDark)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
                 .padding(horizontal = 30.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -74,14 +75,17 @@ fun ConnectionFailureScreen(
                 Box(
                     modifier = Modifier
                         .size(88.dp)
-                        .background(color = ErrorDark.copy(alpha = 0.12f), shape = CircleShape),
+                        .background(
+                            color = LocalNetHalExtendedColors.current.error.copy(alpha = 0.12f),
+                            shape = CircleShape,
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     ErrorGlyph()
                 }
                 Text(
                     text = titleFor(kind),
-                    color = OnBackgroundDark,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
@@ -89,7 +93,7 @@ fun ConnectionFailureScreen(
                 )
                 Text(
                     text = leadInFor(kind),
-                    color = OnSurfaceVariantDark,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.5.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(bottom = 20.dp),
@@ -97,14 +101,14 @@ fun ConnectionFailureScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(color = SurfaceDark, shape = RoundedCornerShape(14.dp))
+                        .background(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(14.dp))
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
                         text = reason,
-                        color = OnSurfaceVariantDark,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.5.sp,
                     )
                 }
@@ -124,7 +128,7 @@ fun ConnectionFailureScreen(
                 }
                 OutlinedButton(
                     onClick = onFindPassword,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = OnSurfaceVariantDark),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -152,23 +156,25 @@ private fun leadInFor(kind: FailureKind): String = when (kind) {
 
 @Composable
 private fun ErrorGlyph() {
+    // Capturado fora do `Canvas`: o lambda de desenho roda em `DrawScope`, sem `MaterialTheme`.
+    val glyphColor = LocalNetHalExtendedColors.current.error
     Canvas(modifier = Modifier.size(40.dp)) {
         val strokeWidth = 1.8.dp.toPx()
         drawCircle(
-            color = ErrorDark,
+            color = glyphColor,
             radius = size.minDimension / 2f - strokeWidth,
             style = Stroke(width = strokeWidth),
         )
         val inset = size.minDimension * 0.32f
         drawLine(
-            color = ErrorDark,
+            color = glyphColor,
             start = Offset(inset, inset),
             end = Offset(size.width - inset, size.height - inset),
             strokeWidth = strokeWidth * 1.1f,
             cap = StrokeCap.Round,
         )
         drawLine(
-            color = ErrorDark,
+            color = glyphColor,
             start = Offset(size.width - inset, inset),
             end = Offset(inset, size.height - inset),
             strokeWidth = strokeWidth * 1.1f,

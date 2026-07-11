@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -56,36 +57,36 @@ fun LoginScreen(
         viewModel.password.isNotBlank() &&
         !isTesting
 
-    Scaffold(containerColor = BackgroundDark) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(BackgroundDark)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
                 .padding(horizontal = 26.dp, vertical = 28.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
             Text(
                 text = "Acesse seu modem",
-                color = OnBackgroundDark,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 6.dp),
             )
             Text(
                 text = subtitleFor(readyState),
-                color = OnSurfaceVariantDark,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.5.sp,
                 modifier = Modifier.padding(bottom = 24.dp),
             )
 
             val fieldColors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = OnBackgroundDark,
-                unfocusedTextColor = OnBackgroundDark,
+                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
                 focusedBorderColor = NetHalAccent,
-                unfocusedBorderColor = BorderDark,
-                focusedContainerColor = SurfaceDark,
-                unfocusedContainerColor = SurfaceDark,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -165,7 +166,7 @@ private fun subtitleFor(state: PairingAuthUiState.Ready?): String {
 private fun FieldCaption(text: String) {
     Text(
         text = text,
-        color = OnSurfaceTertiaryDark,
+        color = LocalNetHalExtendedColors.current.onSurfaceTertiary,
         fontSize = 10.sp,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 1.sp,
@@ -184,22 +185,22 @@ private fun SecurityNoticeCard(showTofuWarning: Boolean) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 18.dp)
-            .background(color = SurfaceDark, shape = RoundedCornerShape(18.dp))
-            .border(width = 1.dp, color = BorderDark, shape = RoundedCornerShape(18.dp))
+            .background(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(18.dp))
+            .border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(18.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = "Sua senha não é salva neste aparelho nem enviada a nenhum servidor — ela " +
                 "existe só durante esta sessão, na memória do app.",
-            color = OnSurfaceVariantDark,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 11.5.sp,
         )
         Text(
             text = "Este e outros equipamentos da mesma família aceitam só uma sessão " +
                 "administrativa por vez. Se a WebUI do equipamento estiver aberta em um " +
                 "navegador, feche-a antes de entrar — do contrário a autenticação pode falhar.",
-            color = OnSurfaceVariantDark,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 11.5.sp,
         )
         if (showTofuWarning) {
@@ -208,7 +209,7 @@ private fun SecurityNoticeCard(showTofuWarning: Boolean) {
                     "login, sem certificado digital — não é possível confirmar de antemão que " +
                     "você está realmente falando com o seu roteador. Use esta autenticação " +
                     "apenas na sua própria rede local, em que você confia.",
-                color = ErrorDark,
+                color = LocalNetHalExtendedColors.current.error,
                 fontSize = 11.5.sp,
             )
         }
@@ -223,13 +224,13 @@ private fun CredentialTestFeedback(testState: CredentialTestState) {
         // só aparece no instante entre a resposta chegar e a navegação disparar, honesto mas breve.
         is CredentialTestState.InvalidCredentials -> Text(
             text = "Usuário ou senha incorretos: ${testState.reason}",
-            color = ErrorDark,
+            color = LocalNetHalExtendedColors.current.error,
             fontSize = 12.sp,
             modifier = Modifier.padding(top = 12.dp),
         )
         is CredentialTestState.Failure -> Text(
             text = "Não foi possível autenticar: ${testState.reason}",
-            color = ErrorDark,
+            color = LocalNetHalExtendedColors.current.error,
             fontSize = 12.sp,
             modifier = Modifier.padding(top = 12.dp),
         )
