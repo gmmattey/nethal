@@ -25,7 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.nethal.feature.wifinetwork.unavailable.UnavailableResourceState
+import com.nethal.feature.toolscommon.UnavailableResourceState
 
 /**
  * Tela "Wi-Fi & Rede" (issue #84, protótipos `3b`/`3e`) — casca de conteúdo da aba "Rede" do host
