@@ -27,6 +27,7 @@ import com.nethal.core.model.DeviceType
 import com.nethal.core.model.SignalStatus
 import com.nethal.core.model.WanStatus
 import com.nethal.core.protocol.http.HttpTransport
+import com.nethal.core.util.PiiHashing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -248,7 +249,7 @@ internal class NokiaGponDriverFamily(
                             model = info.model,
                             firmware = info.softwareVersion,
                             hardwareVersion = info.hardwareVersion,
-                            serialNumberHash = info.serialNumber,
+                            serialNumberHash = PiiHashing.sha256Hex(info.serialNumber),
                             uptimeSeconds = info.uptimeSeconds,
                             deviceType = DeviceType.ONT,
                         ),

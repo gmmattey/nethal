@@ -1,5 +1,6 @@
 package com.nethal.core.protocol.http
 
+import com.nethal.core.protocol.PrivateIpRanges
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -67,6 +68,39 @@ data class HttpTransportConfig(
 )
 
 /**
+ * Guard obrigatório de IP privado para qualquer requisição que saia de [DefaultHttpTransport] —
+ * defesa em profundidade citada na issue #55: o Network Security Config libera cleartext HTTP
+ * globalmente (NSC não suporta CIDR), então a restrição real a "só fala com a LAN local" precisa
+ * ser aplicada aqui em runtime, não deixada como responsabilidade de cada chamador.
+ *
+ * Aceita RFC 1918 (via [PrivateIpRanges], mesma faixa usada no guard de SSRF do
+ * `UpnpIgdProbe.isLanUrl`) **mais loopback** (`127.0.0.0/8`). Isso é deliberadamente mais
+ * permissivo que [PrivateIpRanges], que exclui loopback por design (ver KDoc de
+ * `PrivateIpRanges`) — mas a ameaça ali é outra: aquele guard filtra URL fornecida por um
+ * dispositivo não confiável (redirect SSDP/descriptor), enquanto este filtra o destino de
+ * qualquer chamada feita pelo próprio app. Loopback nunca sai da máquina, então não amplia
+ * superfície de ataque nenhuma — e é o que o harness de teste local (`DefaultHttpTransportTest`,
+ * `com.sun.net.httpserver`) usa para simular um equipamento real sem hardware físico.
+ *
+ * Só aceita IP literal (IPv4 de 4 octetos) — hostname (exigiria resolução DNS) e IPv6 (não
+ * suportado por [PrivateIpRanges]) são rejeitados por padrão, falha segura.
+ *
+ * Público (não `internal`) para reaproveito fora deste arquivo — é o mesmo padrão de guard que a
+ * futura capability de Verificação de porta (issues #100/#94) deve consultar, recebendo só
+ * IP/host, sem depender de montar uma URL.
+ */
+object HttpTransportIpGuard {
+
+    fun isAllowedHost(host: String): Boolean = PrivateIpRanges.isPrivate(host) || isLoopback(host)
+
+    private fun isLoopback(ip: String): Boolean {
+        val octets = ip.trim().split(".").mapNotNull { it.toIntOrNull() }
+        if (octets.size != 4 || octets.any { it !in 0..255 }) return false
+        return octets[0] == 127
+    }
+}
+
+/**
  * Implementação real de [HttpTransport] via `HttpURLConnection`. Todo o comportamento observável
  * (timeouts, headers, redirect) é decidido por [config] — a lógica de leitura/parsing de resposta e
  * cookie é a única parte de fato compartilhada entre TP-Link e Nokia.
@@ -108,6 +142,7 @@ class DefaultHttpTransport(private val config: HttpTransportConfig) : HttpTransp
         extraHeaders: Map<String, String>,
         cookiesToSend: Map<String, String>,
     ): HttpTransportResponse {
+        requireAllowedHost(url)
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = config.connectTimeoutMillis
@@ -130,6 +165,7 @@ class DefaultHttpTransport(private val config: HttpTransportConfig) : HttpTransp
         cookies: Map<String, String>,
         extraHeaders: Map<String, String>,
     ): HttpTransportResponse {
+        requireAllowedHost(url)
         val bodyBytes = body.toByteArray(Charsets.UTF_8)
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -207,4 +243,17 @@ class DefaultHttpTransport(private val config: HttpTransportConfig) : HttpTransp
 
     private fun portSuffix(url: URL): String =
         if (url.port !in listOf(-1, 80, 443)) ":${url.port}" else ""
+
+    private fun requireAllowedHost(url: String) {
+        val host = try {
+            URL(url).host
+        } catch (e: Exception) {
+            throw IOException("URL inválida para DefaultHttpTransport: $url", e)
+        }
+        if (!HttpTransportIpGuard.isAllowedHost(host)) {
+            throw IOException(
+                "DefaultHttpTransport recusou conexão fora da LAN local (RFC 1918/loopback): host=$host",
+            )
+        }
+    }
 }

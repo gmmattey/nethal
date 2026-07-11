@@ -8,6 +8,7 @@ import com.nethal.core.driver.nokia.sampleHomeNetworkingHtml
 import com.nethal.core.driver.nokia.successfulLoginResponse
 import com.nethal.core.model.CapabilityId
 import com.nethal.core.model.CapabilityPayload
+import com.nethal.core.util.PiiHashing
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -159,6 +160,8 @@ class NokiaGponDriverFamilyTest {
         val payload = (result as CapabilityReadResult.Success).payload as CapabilityPayload.DeviceInfo
         assertEquals("G-1425G-B", payload.info.model)
         assertEquals("Nokia", payload.info.vendor)
+        assertEquals(PiiHashing.sha256Hex("ALCLXXXXXXXX"), payload.info.serialNumberHash)
+        assertTrue(payload.info.serialNumberHash != "ALCLXXXXXXXX")
     }
 
     @Test

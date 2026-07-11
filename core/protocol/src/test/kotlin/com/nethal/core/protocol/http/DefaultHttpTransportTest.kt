@@ -4,8 +4,11 @@ import com.sun.net.httpserver.HttpServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
@@ -149,5 +152,47 @@ class DefaultHttpTransportTest {
             "sid=abc123sessionid; lsid=legacy-abc123; lang=eng",
             receivedCookieHeader.get(5, TimeUnit.SECONDS),
         )
+    }
+
+    @Test
+    fun `get() rejects a public ip before opening any connection - guard obrigatorio da issue 55`() {
+        try {
+            transport.get("http://8.8.8.8/device_status.cgi")
+            fail("esperava IOException do guard de IP privado")
+        } catch (e: IOException) {
+            assertTrue(e.message.orEmpty().contains("8.8.8.8"))
+        }
+    }
+
+    @Test
+    fun `post() rejects a public ip before opening any connection - guard obrigatorio da issue 55`() {
+        try {
+            transport.post("http://201.17.45.90/login", body = "")
+            fail("esperava IOException do guard de IP privado")
+        } catch (e: IOException) {
+            assertTrue(e.message.orEmpty().contains("201.17.45.90"))
+        }
+    }
+
+    @Test
+    fun `get() rejects a malformed url instead of leaking a raw parse exception`() {
+        try {
+            transport.get("not a url")
+            fail("esperava IOException do guard de IP privado")
+        } catch (e: IOException) {
+            // ok - URL malformada deve virar IOException, não uma exceção não tratada
+        }
+    }
+
+    @Test
+    fun `loopback used by the local test harness still goes through - guard nao regride os testes existentes`() {
+        server.createContext("/ok") { exchange ->
+            exchange.sendResponseHeaders(200, 0)
+            exchange.responseBody.close()
+        }
+
+        val response = transport.get("${baseUrl()}/ok")
+
+        assertEquals(200, response.statusCode)
     }
 }
