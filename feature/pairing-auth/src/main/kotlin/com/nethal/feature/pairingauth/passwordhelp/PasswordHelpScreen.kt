@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,11 +45,11 @@ import com.nethal.feature.pairingauth.internal.BackButton
  */
 @Composable
 fun PasswordHelpScreen(onBack: () -> Unit) {
-    Scaffold(containerColor = BackgroundDark) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(BackgroundDark)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
                 .padding(horizontal = 26.dp, vertical = 24.dp)
                 .verticalScroll(rememberScrollState()),
@@ -57,7 +58,7 @@ fun PasswordHelpScreen(onBack: () -> Unit) {
                 BackButton(onClick = onBack)
                 Text(
                     text = "Onde encontrar a senha",
-                    color = OnBackgroundDark,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -67,8 +68,8 @@ fun PasswordHelpScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 18.dp, bottom = 18.dp)
-                    .background(color = SurfaceDark, shape = RoundedCornerShape(22.dp))
-                    .border(width = 1.dp, color = BorderDark, shape = RoundedCornerShape(22.dp))
+                    .background(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(22.dp))
+                    .border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(22.dp))
                     .padding(22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -77,7 +78,7 @@ fun PasswordHelpScreen(onBack: () -> Unit) {
                 Text(
                     text = "A senha padrão de administrador costuma estar impressa na etiqueta " +
                         "colada na parte traseira ou inferior do equipamento.",
-                    color = OnSurfaceVariantDark,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.5.sp,
                     textAlign = TextAlign.Center,
                 )
@@ -85,7 +86,7 @@ fun PasswordHelpScreen(onBack: () -> Unit) {
 
             Text(
                 text = "O QUE PROCURAR NA ETIQUETA",
-                color = OnSurfaceTertiaryDark,
+                color = LocalNetHalExtendedColors.current.onSurfaceTertiary,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
@@ -95,8 +96,8 @@ fun PasswordHelpScreen(onBack: () -> Unit) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(color = SurfaceDark, shape = RoundedCornerShape(18.dp))
-                    .border(width = 1.dp, color = BorderDark, shape = RoundedCornerShape(18.dp)),
+                    .background(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(18.dp))
+                    .border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(18.dp)),
             ) {
                 LabelRow(label = "Campo \"Usuário\" / \"User\"", divider = true)
                 LabelRow(label = "Campo \"Senha\" / \"Password\" / \"WiFi Key\"", divider = true)
@@ -106,7 +107,7 @@ fun PasswordHelpScreen(onBack: () -> Unit) {
             Text(
                 text = "Os nomes exatos dos campos variam por fabricante — a etiqueta é a fonte " +
                     "confiável, o NetHAL nunca preenche ou sugere uma senha por você.",
-                color = OnSurfaceTertiaryDark,
+                color = LocalNetHalExtendedColors.current.onSurfaceTertiary,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(top = 10.dp, bottom = 22.dp),
             )
@@ -127,8 +128,8 @@ fun PasswordHelpScreen(onBack: () -> Unit) {
 private fun LabelSticker() {
     Column(
         modifier = Modifier
-            .background(color = BackgroundDark, shape = RoundedCornerShape(14.dp))
-            .border(width = 1.5.dp, color = BorderDark, shape = RoundedCornerShape(14.dp))
+            .background(color = MaterialTheme.colorScheme.background, shape = RoundedCornerShape(14.dp))
+            .border(width = 1.5.dp, color = MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(14.dp))
             .padding(vertical = 18.dp, horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -138,7 +139,7 @@ private fun LabelSticker() {
                 Box(
                     modifier = Modifier
                         .padding(2.dp)
-                        .background(color = BorderDark, shape = CircleShape)
+                        .background(color = MaterialTheme.colorScheme.outline, shape = CircleShape)
                         .padding(4.dp),
                 )
             }
@@ -161,7 +162,7 @@ private fun LabelRow(label: String, divider: Boolean) {
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
-            Text(text = label, color = OnSurfaceVariantDark, fontSize = 12.5.sp)
+            Text(text = label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.5.sp)
         }
         if (divider) {
             Box(
@@ -169,7 +170,7 @@ private fun LabelRow(label: String, divider: Boolean) {
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
                     .height(1.dp)
-                    .background(BorderDark),
+                    .background(MaterialTheme.colorScheme.outline),
             )
         }
     }

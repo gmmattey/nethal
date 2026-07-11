@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,11 +44,11 @@ import com.nethal.feature.pairingauth.internal.RouterGlyph
  */
 @Composable
 fun ConnectingScreen(deviceLabel: String?) {
-    Scaffold(containerColor = BackgroundDark) { padding ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(BackgroundDark)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(padding)
                 .padding(horizontal = 30.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -61,14 +62,14 @@ fun ConnectingScreen(deviceLabel: String?) {
 
                 Text(
                     text = "Conectando ao modem",
-                    color = OnBackgroundDark,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 8.dp),
                 )
                 Text(
                     text = "Isso pode levar alguns segundos. Não feche o aplicativo.",
-                    color = OnSurfaceVariantDark,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.5.sp,
                     modifier = Modifier.padding(top = 8.dp, bottom = 28.dp),
                 )
@@ -99,14 +100,14 @@ private fun ConnectingRing() {
         CircularProgressIndicator(
             modifier = Modifier.size(132.dp).rotate(angle),
             color = NetHalAccent,
-            trackColor = BorderDark,
+            trackColor = MaterialTheme.colorScheme.outline,
             strokeWidth = 4.dp,
         )
         Box(
             modifier = Modifier
                 .size(60.dp)
-                .background(color = SurfaceDark, shape = RoundedCornerShape(16.dp))
-                .border(width = 1.dp, color = BorderDark, shape = RoundedCornerShape(16.dp)),
+                .background(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(16.dp))
+                .border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center,
         ) {
             RouterGlyph(tint = NetHalAccent, size = 26.dp)
@@ -122,7 +123,7 @@ private fun ChecklistDone(text: String) {
                 .size(16.dp)
                 .background(color = NetHalAccent, shape = CircleShape),
         )
-        Text(text = text, color = OnBackgroundDark, fontSize = 12.5.sp)
+        Text(text = text, color = MaterialTheme.colorScheme.onBackground, fontSize = 12.5.sp)
     }
 }
 
@@ -132,9 +133,9 @@ private fun ChecklistPending(text: String) {
         CircularProgressIndicator(
             modifier = Modifier.size(16.dp),
             color = NetHalAccent,
-            trackColor = BorderDark,
+            trackColor = MaterialTheme.colorScheme.outline,
             strokeWidth = 2.dp,
         )
-        Text(text = text, color = OnSurfaceVariantDark, fontSize = 12.5.sp)
+        Text(text = text, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.5.sp)
     }
 }
