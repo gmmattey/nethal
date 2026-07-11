@@ -1,5 +1,6 @@
 package com.nethal.core.driver.family.tplink.stokluci
 
+import com.nethal.core.catalog.CapabilityActionResult
 import com.nethal.core.catalog.CapabilityReadResult
 import com.nethal.core.catalog.CompatibilityProfile
 import com.nethal.core.catalog.DriverFamily
@@ -118,6 +119,18 @@ internal sealed interface TpLinkStokLuciSnapshotOutcome {
  * (`ManualCheckRunner`) e os testes existentes dependem desse comportamento; não foram tocados para
  * não arriscar o único caminho já validado contra hardware físico. [authenticate]/[readCapability]
  * são um caminho adicional, não uma substituição.
+ *
+ * **issues #95/#103 (`REBOOT_DEVICE`, TP-Link Archer C6 apenas)**: [executeAction] implementa a
+ * primeira capability de AÇÃO/escrita "genérica" do produto (fora do fluxo de autenticação) —
+ * reinicia o equipamento via `config.rebootPath`/`config.rebootQuery` (`admin/system?form=reboot`),
+ * reaproveitando [authenticatedClient] (mesma sessão de [readCapability], não login novo por
+ * chamada). Restrita a este driver por decisão de produto do Rafael/Luiz — nunca no Archer C20 nem
+ * no Nokia, mesmo que o desenho de `DriverFamily.executeAction` permitisse tecnicamente nos dois
+ * (nenhuma outra Driver Family deste repositório sobrescreve este método). Confirmação explícita do
+ * usuário é responsabilidade da UI (`:feature:tools-reboot-wan`) antes de sequer chamar
+ * `CapabilityEngine.executeAction` — este método nunca pergunta, só executa. Sem confirmação por
+ * evidência ao vivo (mesma regressão de sessão HTTP 403 de #125 acima bloqueia qualquer teste real);
+ * nenhum reboot real foi disparado contra o hardware do Luiz durante esta implementação.
  *
  * Guarda de SSRF obrigatória (RFC 1918), mesma classe de risco de toda Driver Family do NetHAL —
  * falha rápido, sem tentar login, quando o host não é IP privado.
@@ -528,6 +541,67 @@ internal class TpLinkStokLuciDriverFamily(
                 ),
             )
             is RetryOutcome.Failure -> TpLinkStokLuciPingOutcome.Failure(outcome.reason, outcome.error.message ?: outcome.error.toString())
+        }
+    }
+
+    /**
+     * Implementação de [DriverFamily.executeAction] — hoje reconhece só `REBOOT_DEVICE` (issues
+     * #95/#103), a primeira capability de AÇÃO/escrita "genérica" do produto (fora do fluxo de
+     * autenticação) com execução real. Qualquer outro `id` cai no default honesto `Unavailable`
+     * (mesmo texto do `DriverFamily.executeAction` base, mais específico por driver) — é assim,
+     * estruturalmente, que esta capability fica restrita **só** a este driver (decisão de produto do
+     * Rafael): nenhuma outra `DriverFamily` deste repositório sobrescreve este método, então a
+     * implementação default (`Unavailable`) é tudo o que Archer C20/Nokia G-1425G-B expõem para
+     * `REBOOT_DEVICE` — nunca um `if (vendor == ...)` em código compartilhado.
+     *
+     * Usa [authenticatedClient] (sessão já aberta via [authenticate]/[com.nethal.core.capability.CapabilityEngine]),
+     * mesmo padrão de [readCapability] — diferente de [runNativeDiagnosticPing] (que faz login novo a
+     * cada chamada): reboot é chamado pela UI através do `CapabilityEngine` já autenticado pela tela
+     * de sessão (mesmo fluxo de `readCapability`), não tem motivo para duplicar handshake.
+     *
+     * **Sem retry automático de propósito** (diferente de [readCapability]/[runNativeDiagnosticPing],
+     * que usam [executeWithRetry]): reenviar automaticamente uma ação que MUDA O ESTADO do
+     * equipamento em caso de falha de rede arrisca disparar dois reboots reais por uma falha só de
+     * leitura da resposta — pior que devolver `Failure` e deixar o usuário decidir se tenta de novo
+     * (o mesmo raciocínio conservador de todo o NetHAL, aplicado aqui com mais peso por ser uma ação
+     * disruptiva de verdade).
+     *
+     * Protocolo assumido, **sem confirmação por evidência ao vivo** (`config.rebootPath`/
+     * `config.rebootQuery`, ver KDoc de [TpLinkStokLuciDriverConfig.rebootPath]): um único
+     * `operation=write` no endpoint de reboot. Não há passo de leitura de confirmação (diferente do
+     * diagnóstico de ping, que lê `result` depois de escrever) — nenhum campo de status de reboot foi
+     * mapeado para este firmware; a única confirmação possível hoje é a resposta HTTP 200 do próprio
+     * `write`. A regressão de sessão HTTP 403 documentada em `fingerprintEvidence[]`/issue #125
+     * impede qualquer validação ao vivo real desta implementação no momento — capability entra
+     * `EXPERIMENTAL` no catálogo por esse motivo, não por dúvida sobre a restrição de driver.
+     */
+    override suspend fun executeAction(id: CapabilityId): CapabilityActionResult {
+        if (id != CapabilityId.REBOOT_DEVICE) {
+            return CapabilityActionResult.Unavailable(
+                reason = "TpLinkStokLuciDriverFamily não implementa a ação $id nesta rodada.",
+            )
+        }
+        val client = authenticatedClient
+            ?: return CapabilityActionResult.Unavailable(
+                reason = "Reiniciar o equipamento ($id) exige sessão autenticada — chame authenticate(username, password) " +
+                    "(via CapabilityEngine) antes de executar ações.",
+            )
+
+        return withContext(Dispatchers.IO) {
+            try {
+                client.fetchAuthenticatedRaw(config.rebootPath, config.rebootQuery, "operation=write")
+                CapabilityActionResult.Success(
+                    capability = Capability(id = CapabilityId.REBOOT_DEVICE, state = CapabilityState.AVAILABLE, confidence = 1.0),
+                )
+            } catch (e: TpLinkStokLuciLoginException) {
+                if (e.reason == TpLinkStokLuciLoginFailureReason.SESSION_EXPIRED) {
+                    CapabilityActionResult.SessionExpired(reason = e.message ?: "sessão expirada ao executar $id")
+                } else {
+                    CapabilityActionResult.Failure(reason = e.message ?: "falha inesperada ao executar $id", cause = e)
+                }
+            } catch (e: IOException) {
+                CapabilityActionResult.Failure(reason = e.message ?: "falha de rede ao executar $id", cause = e)
+            }
         }
     }
 
