@@ -40,6 +40,9 @@ android {
 
     buildFeatures {
         compose = true
+        // Necessário para BuildConfig.VERSION_NAME/VERSION_CODE — única fonte real de "Versão do
+        // app" em Configurações (#85); o módulo :feature:settings não inventa esse dado.
+        buildConfig = true
     }
 }
 
@@ -58,6 +61,7 @@ dependencies {
     implementation(project(":drivers:tplink-legacy-cgi"))
     implementation(project(":drivers:tplink-stok-luci"))
     implementation(project(":drivers:tplink-experimental"))
+    implementation(project(":feature:settings"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -28,21 +27,23 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.nethal.core.designsystem.R
 import com.nethal.core.navigation.BottomNavDestination
+import com.nethal.feature.settings.settingsGraph
+import com.nethal.lab.BuildConfig
 import com.nethal.lab.ui.common.NetHalViewModelFactory
-import com.nethal.lab.ui.settings.SettingsScreen
-import com.nethal.lab.ui.settings.SettingsViewModel
 
 /**
  * Host de navegação inferior do NetHAL Lab ("modo uso diário", #67) — composition root montado em
  * `:app` (ADR 0002 Fase 2). Hoje o `NavHost` interno aponta para composables placeholder simples;
- * quando os módulos `:feature:status` / `:feature:wifi-network` / `:feature:devices` /
- * `:feature:settings` nascerem (issues #83-86), cada um passa a expor seu próprio
- * `NavGraphBuilder.xyzGraph()` usando as rotas de [BottomNavDestination] — este host não muda de
- * forma, só troca `composable(placeholder)` por `xyzGraph(navController)`.
+ * quando os módulos `:feature:status` / `:feature:wifi-network` / `:feature:devices` nascerem
+ * (issues #83, #84, #86), cada um passa a expor seu próprio `NavGraphBuilder.xyzGraph()` usando as
+ * rotas de [BottomNavDestination] — este host não muda de forma, só troca `composable(placeholder)`
+ * por `xyzGraph(navController)`.
  *
- * Configurações reaproveita a `SettingsScreen` já existente (antes pendurada numa rota órfã em
- * `NetHalNavHost`) — as outras três abas ainda não têm conteúdo real, só a casca (spec completa em
- * `docs/design/design-system.dc.html` seção 1l).
+ * Configurações já é o real: `:feature:settings` (#85) nasceu modular, e este host monta
+ * `settingsGraph()` no lugar do antigo `composable(BottomNavDestination.SETTINGS.route) { ... }`
+ * inline que reaproveitava a `SettingsScreen` de `:app` (essa `SettingsScreen` não existe mais em
+ * `:app` — moveu de módulo, não foi duplicada). As outras três abas ainda não têm conteúdo real, só
+ * a casca (spec completa em `docs/design/design-system.dc.html` seção 1l).
  *
  * Layout e comportamento (altura 80dp, padding 12/16dp, ícone 24dp, indicador pill 64×32dp raio
  * 16dp, rótulo 12sp 600/400) usam o default do `NavigationBar` Material 3 — bate com a spec sem
@@ -124,10 +125,11 @@ fun BottomNavHost(
                     text = "Conteúdo de Dispositivos — casca (issue #86)",
                 )
             }
-            composable(BottomNavDestination.SETTINGS.route) {
-                val viewModel: SettingsViewModel = viewModel(factory = viewModelFactory)
-                SettingsScreen(viewModel = viewModel)
-            }
+            settingsGraph(
+                navController = navController,
+                viewModelFactory = viewModelFactory,
+                appVersionLabel = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            )
         }
     }
 }

@@ -14,6 +14,7 @@ import com.nethal.core.model.NetworkTarget
 import com.nethal.core.protocol.http.DefaultHttpTransport
 import com.nethal.core.protocol.http.HttpTransport
 import com.nethal.core.protocol.http.HttpTransportConfig
+import com.nethal.feature.settings.SettingsViewModel
 import com.nethal.lab.ui.authentication.AuthenticationViewModel
 import com.nethal.lab.ui.capabilities.CapabilitiesViewModel
 import com.nethal.lab.ui.capabilities.CapabilityItem
@@ -22,7 +23,6 @@ import com.nethal.lab.ui.equipment.EquipmentDetectedViewModel
 import com.nethal.lab.ui.onboarding.BetaOptInViewModel
 import com.nethal.lab.ui.onboarding.WelcomeViewModel
 import com.nethal.lab.ui.report.ReportViewModel
-import com.nethal.lab.ui.settings.SettingsViewModel
 import java.net.URL
 
 /**

@@ -17,9 +17,10 @@ import org.junit.runner.RunWith
 
 /**
  * Cobre a troca entre os 4 destinos do host de bottom nav (#67) — casca de infraestrutura, sem
- * conteúdo final das abas Status/Rede/Dispositivos (issues #83, #84, #86). Configurações reaproveita
- * `SettingsScreen` já existente, aqui só verificada quanto à presença (o conteúdo dela já tem
- * cobertura própria em `SettingsViewModel`/testes unitários).
+ * conteúdo final das abas Status/Rede/Dispositivos (issues #83, #84, #86). Configurações monta o
+ * `settingsGraph()` real de `:feature:settings` (#85); aqui verificada quanto à presença e à
+ * navegação interna para o item de privacidade absorvido de `PrivacyScreen` (decisão #66) — o
+ * conteúdo em si (toggle de programa beta etc.) tem cobertura própria em `SettingsViewModelTest`.
  */
 @RunWith(AndroidJUnit4::class)
 class BottomNavHostTest {
@@ -73,6 +74,19 @@ class BottomNavHostTest {
     @Test
     fun trocaParaConfiguracoesReaproveitaSettingsScreen() {
         composeRule.onNodeWithText("Configurações").performClick()
+
+        composeRule.onNodeWithTag("home_settings_screen").assertExists()
+    }
+
+    @Test
+    fun politicaDePrivacidadeNavegaParaConteudoAbsorvidoDaPrivacyScreen() {
+        composeRule.onNodeWithText("Configurações").performClick()
+
+        composeRule.onNodeWithText("Política de privacidade").performClick()
+
+        composeRule.onNodeWithTag("settings_privacy_screen").assertExists()
+
+        composeRule.onNodeWithText("Voltar").performClick()
 
         composeRule.onNodeWithTag("home_settings_screen").assertExists()
     }

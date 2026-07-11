@@ -1,4 +1,4 @@
-package com.nethal.lab.ui.settings
+package com.nethal.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +10,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/**
+ * Movido de `com.nethal.lab.ui.settings` (issue #85, ADR 0002 Fase 2) — mesmo comportamento,
+ * só de módulo novo. O opt-in de `TELEMETRY_BETA` em si é apresentado no onboarding "Notificações"
+ * (#71, decisão #66); aqui só a saída (`leaveBetaProgram`), referenciando o mesmo
+ * `ConsentRepository` — não duplica fonte da verdade.
+ */
 class SettingsViewModel(
     private val consentRepository: ConsentRepository,
 ) : ViewModel() {

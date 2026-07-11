@@ -1,4 +1,4 @@
-package com.nethal.lab.ui.privacy
+package com.nethal.feature.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,21 +13,26 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 /**
- * Tela "Ver privacidade", acionada a partir da Tela 1 (spec §11). Resume as regras de
- * telemetria sanitizada (§8.9) e a ausência de armazenamento de credenciais.
+ * Conteúdo de privacidade absorvido de `PrivacyScreen` (descontinuada, decisão de produto #66 —
+ * `docs/product/decisions/0001-telas-orfas-redesenho.md`). Antes era uma tela própria de
+ * onboarding acionada por "Ver privacidade" na Tela de Boas-vindas; agora é um item dentro de
+ * Configurações (linha "Política de privacidade", seção SOBRE), consultável a qualquer momento —
+ * texto preservado integralmente, só o ponto de entrada mudou.
  */
 @Composable
-fun PrivacyScreen(onBack: () -> Unit) {
+fun SettingsPrivacyScreen(onBack: () -> Unit) {
     Scaffold { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .testTag("settings_privacy_screen"),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(text = "Privacidade", style = MaterialTheme.typography.headlineSmall)

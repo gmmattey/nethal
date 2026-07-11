@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!--
+      Chevron de navegação usado nas linhas de lista (ex.: telas 3c/3f, Configurações) — porta
+      direta de docs/design/assets/icons/{dark,light}/chevron-right.svg (mesmo path nas duas
+      variantes, só muda a cor do stroke pelo tema; app é dark-only hoje).
+    -->
+    <path
+        android:pathData="M9,6l6,6 -6,6"
+        android:strokeColor="#8891A8"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+</vector>
