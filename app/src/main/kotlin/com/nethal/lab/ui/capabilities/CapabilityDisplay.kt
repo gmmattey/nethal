@@ -106,4 +106,9 @@ fun capabilityPayloadSummary(payload: CapabilityPayload): String = when (payload
             }
         }
     }
+    is CapabilityPayload.DeviceInfo -> {
+        val vendor = payload.info.vendor ?: "fabricante não lido"
+        val model = payload.info.model ?: "modelo não lido"
+        "$vendor $model"
+    }
 }
