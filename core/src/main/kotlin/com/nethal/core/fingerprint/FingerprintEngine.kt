@@ -131,10 +131,11 @@ class DefaultFingerprintEngine(
 
     /**
      * Compara evidência capturada (título HTML real, headers reais) contra os valores
-     * documentados em `fingerprintEvidence[]` do profile. Os dois profiles atuais (Nokia,
-     * TP-Link) têm `html_title`/`http_headers` com `value: null` — nenhum match é possível
-     * ainda por definição do próprio catálogo, não por bug deste engine. Isso muda assim que
-     * o catálogo do Diego ganhar evidência real (primeiro probe físico).
+     * documentados em `fingerprintEvidence[]` do profile. Nem todo profile tem evidência real
+     * preenchida ainda — `value: null` em `html_title`/`http_headers` significa "sem probe físico
+     * ainda para este profile" (nenhum match possível para ele), enquanto profiles já testados ao
+     * vivo (ex.: `nokia_g1425gb_v1`, `html_title = "GPON Home Gateway"`) participam do match
+     * normalmente.
      */
     private fun matchesHeaderOrBanner(profile: CompatibilityProfile, evidence: HttpFingerprintEvidence): Boolean {
         val candidateStrings = listOfNotNull(evidence.httpTitle, evidence.serverHeader, evidence.wwwAuthenticateHeader)

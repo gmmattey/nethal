@@ -87,8 +87,17 @@ Family nova só se justifica quando o protocolo/autenticação for genuinamente 
 objetivo na §9 do documento de arquitetura, incluindo a regra "primeiro evidência, depois
 abstração" para quando duas Driver Families parecidas podem (ou não) virar uma só.
 
-O TP-Link Archer C20 é o primeiro caso real dessa cadeia (`TpLinkLegacyCgiDriverFamily`, pacote
-`core/driver/family/tplink/legacycgi/`) — reorganizado como caso de validação da arquitetura, sem
-mudança de estágio, protocolo ou capability. TP-Link Archer C6 e Nokia G-1425G-B ainda não foram
-migrados para Driver Family (continuam na forma anterior, `TplinkOntDriver`/`NokiaOntDriver`) —
-migração deles é trabalho futuro, não bloqueia uso do driver hoje.
+**Drivers implementados como Driver Family (2026-07-10):**
+- `TpLinkLegacyCgiDriverFamily` (`core/driver/family/tplink/legacycgi/`) — TP-Link Archer C20,
+  protocolo dispatcher `/cgi?1&1&1&8` + HTTP Basic auth, stage `READ_ONLY_ALPHA`
+- `TpLinkStokLuciDriverFamily` (`core/driver/family/tplink/stokluci/`) — TP-Link Archer C6,
+  protocolo `/cgi-bin/luci` + token `stok`, stage `READ_ONLY_ALPHA`, Capability Engine com
+  sessão gerenciada
+- `NokiaGponDriverFamily` (`core/driver/family/nokia/gpon/`) — Nokia G-1425G-B, protocolo
+  RSA+AES + GPON, stage `READ_ONLY_ALPHA`, sessão gerenciada
+- `TpLinkGdprCgiDriverFamily` e `TpLinkXdrDsDriverFamily` — experimental, parser sem hardware
+  confirmado, stage `DRAFT`/`EXPERIMENTAL`
+
+Telas 1-6 do NetHAL Lab implementadas com Jetpack Compose, consumindo Driver Family via
+Capability Engine: discovery (Tela 1: List, Tela 2: Detail), capabilities (Tela 4),
+autenticação (Tela 5), relatório (Tela 6).

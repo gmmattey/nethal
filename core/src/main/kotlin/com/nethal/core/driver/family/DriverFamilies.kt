@@ -13,12 +13,11 @@ import com.nethal.core.driver.family.tplink.xdrds.TpLinkXdrDsDriverFamilyFactory
  * (`docs/architecture/hal-layering-model.md` §8/§10 passo 6).
  *
  * Vive em `core`, não em `app`, por decisão explícita deste passo (4 do plano de refatoração):
- * o único consumidor real de Driver Family hoje é `ManualCheckRunnerC20` (`core/driver/tplink/`,
- * roda como task Gradle `:core:tplinkC20ManualCheck`), não o módulo `app` — o app ainda não liga
- * nenhum driver ao Capability Engine (que nem existe em código ainda). Quando o app precisar
- * resolver Driver Families em runtime (Capability Engine real, fora de escopo deste passo), este
- * composition root pode migrar para lá ou ser exposto como API pública do `core` consumida pelo
- * `app` — decisão a revisitar no passo 8 do plano (`hal-layering-model.md` §10).
+ * nasceu quando o único consumidor real de Driver Family era `ManualCheckRunnerC20`
+ * (`core/driver/tplink/`, roda como task Gradle `:core:tplinkC20ManualCheck`). Desde a issue #16
+ * o `app` também consome este composition root (`NetHalApplication`/`ViewModelFactory` montam o
+ * `CapabilityEngine` real a partir daqui, usado por `CapabilitiesViewModel`) — este arquivo
+ * continua sendo a única fonte de verdade de quais Driver Families existem, consumida por ambos.
  *
  * Cada Driver Family nova registrada aqui deve ser somada a esta lista — nunca descoberta
  * automaticamente por classpath scanning.
