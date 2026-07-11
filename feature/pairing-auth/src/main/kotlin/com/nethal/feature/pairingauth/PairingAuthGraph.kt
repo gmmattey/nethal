@@ -232,13 +232,21 @@ private fun buildPairingAuthHttpTransport(): HttpTransport = DefaultHttpTranspor
         postAcceptHeader = "application/json, text/javascript, */*; q=0.01",
         postContentType = "application/x-www-form-urlencoded; charset=UTF-8",
         extraPostHeaders = mapOf("X-Requested-With" to "XMLHttpRequest"),
+        // Timestamp fixo (`1693386897767`) confirmado por captura HAR real (Playwright, 2026-07-11,
+        // firmware `1.1.10 Build 20230830 rel.69433(5553)`) — o navegador real sempre envia esse
+        // sufixo no Referer, tanto na fase de login (`login.html?t=...`) quanto nas leituras
+        // autenticadas seguintes (`index.<timestamp>.html`), nunca a URL "limpa" sem sufixo que esta
+        // função enviava antes. Mesmo valor já usado por `TpLinkStokLuciManualCheck.kt` (evidência
+        // anterior, mesma unidade física) — alinhado aqui pela primeira vez. É um carimbo de build do
+        // firmware, não algo por sessão; se um firmware diferente usar outro timestamp, este valor
+        // precisa ser recapturado (não há como derivar sem reler a página de login real).
         postRefererProvider = { url ->
             val base = URL(url)
             val root = "${base.protocol}://${base.host}${if (base.port !in listOf(-1, 80, 443)) ":${base.port}" else ""}"
             if (url.contains("/cgi-bin/luci/;stok=/login")) {
-                "$root/webpages/login.html"
+                "$root/webpages/login.html?t=1693386897767"
             } else {
-                "$root/webpages/index.html"
+                "$root/webpages/index.1693386897767.html"
             }
         },
         followRedirectsManually = false,
