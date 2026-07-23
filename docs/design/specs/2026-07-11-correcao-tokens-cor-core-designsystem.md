@@ -6,7 +6,7 @@ Autora: Vera (UX & Design)
 ## Contexto
 
 Durante a extração mecânica de `Theme.kt`/`Color.kt` para `:core:designsystem` (PR #115, ADR
-0002), o Bruno identificou que o app implementado usa uma paleta teal/cyan
+0002), o Caio identificou que o app implementado usa uma paleta teal/cyan
 (`NetHalTeal #2B6E7A` / `NetHalCyan #35B8C0`, bg `#111417`) que diverge do design system oficial
 documentado em `docs/design/design-system.dc.html` (accent Electric Blue `#006FFF`, bg `#0B0F19`).
 
@@ -50,7 +50,7 @@ tem toggle), consistente com o design brief.
 
 ## Próximo passo
 
-Bruno: revisar visualmente as telas do Lab após o merge (screenshot/emulador) — a troca de accent
+Caio: revisar visualmente as telas do Lab após o merge (screenshot/emulador) — a troca de accent
 de cyan pra azul elétrico muda contraste em botões/ícones que dependiam da cor antiga. Se algum
 componente ficar com contraste insuficiente contra `#0B0F19`, sinalizar pra mim antes de ajustar
 localmente.

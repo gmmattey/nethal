@@ -35,7 +35,7 @@ import org.junit.Test
  * cenários (credencial válida, credencial inválida, driver sem sessão real, handoff de sessão),
  * mais os cenários novos deste cluster: [PairingAuthViewModel.resetAfterFailure],
  * [PairingAuthViewModel.markSessionLostAfterSuccess], e a garantia de que a senha nunca sobrevive
- * em nenhum estado observável de fora (issue #79's critério de teste explícito do Bruno).
+ * em nenhum estado observável de fora (issue #79's critério de teste explícito do Caio).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PairingAuthViewModelTest {

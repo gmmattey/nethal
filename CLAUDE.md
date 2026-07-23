@@ -77,16 +77,21 @@ Execução, backlog, prioridades e bugs vivem no **GitHub Issues** (`gmmattey/ne
 
 ## Squad do projeto
 
+**Sincronização com o portfólio (regra 2026-07-22):** qualquer mudança de composição de squad, nome
+de produto ou repo deve ser propagada no mesmo commit/PR para `C:\Projetos\CLAUDE.md` (raiz do
+workspace) — é o doc que o Marcos (VP) usa pra rotear entre squads, e fica errado silenciosamente
+se ninguém atualizar de fora.
+
 Squad enxuto: 4 papéis ativos, espelhando o padrão do SignallQ.
 
 - **Rafael** — Diretor Técnico & Product Owner (model sonnet, effort medium). Refina demandas, quebra tasks, prioriza, controla WIP, aprova promoção de estágio de driver e decide Done/Not Done. Não implementa. Fonte da verdade de tarefas é o GitHub Issues.
-- **Bruno** — Dev único do squad (model sonnet, effort high). NetHAL Core (SDK), NetHAL Lab (app Compose) e drivers/protocolos por fabricante (absorveu o Diego em 2026-07-10). Implementa a partir do design entregue pela Vera para telas do Lab.
-- **Vera** — UX & Design (model sonnet, effort medium, híbrido Haiku/Sonnet). UI do NetHAL Lab (Compose) e consistência da marca própria do NetHAL (`docs/design/`). Usa **Claude Design** (Artifacts + skills `frontend-design`/`impeccable`), nunca Figma. Entrega protótipo/spec para o Bruno; não edita código de produto além de composição visual.
+- **Caio** — Dev único do squad (model sonnet, effort high). NetHAL Core (SDK), NetHAL Lab (app Compose) e drivers/protocolos por fabricante (absorveu o Diego em 2026-07-10). Implementa a partir do design entregue pela Vera para telas do Lab.
+- **Vera** — UX & Design (model sonnet, effort medium, híbrido Haiku/Sonnet). UI do NetHAL Lab (Compose) e consistência da marca própria do NetHAL (`docs/design/`). Usa **Claude Design** (Artifacts + skills `frontend-design`/`impeccable`), nunca Figma. Entrega protótipo/spec para o Caio; não edita código de produto além de composição visual.
 - **Marisa** — QA, Release, Higiene & Documentação (model haiku, effort medium, escala Sonnet em review pesado). Gate de Done. Segurança entra na revisão normal dela (os três não-negociáveis acima), não como sign-off bloqueante por capability/estágio. Edit/Write apenas para documentação, nunca código de produto.
 
-> **Diego consolidado em 2026-07-10** — papel de drivers/protocolos absorvido pelo Bruno (dev único do squad, padrão SignallQ de 4 papéis). Não invocar mais. Persona arquivada em `.claude/agents/_archive/diego_2026-07-10_consolidado.md`.
+> **Diego consolidado em 2026-07-10** — papel de drivers/protocolos absorvido pelo Caio (dev único do squad, padrão SignallQ de 4 papéis). Não invocar mais. Persona arquivada em `.claude/agents/_archive/diego_2026-07-10_consolidado.md`.
 
-Fluxo padrão: Rafael refina e distribui → Vera desenha (se houver UI) → Bruno implementa (SDK/app/drivers) → Marisa revisa segurança/telemetria/QA e decide o gate → Rafael decide Done e eventual promoção de estágio.
+Fluxo padrão: Rafael refina e distribui → Vera desenha (se houver UI) → Caio implementa (SDK/app/drivers) → Marisa revisa segurança/telemetria/QA e decide o gate → Rafael decide Done e eventual promoção de estágio.
 
 ## Skills do projeto
 

@@ -39,7 +39,7 @@ Progressão é sempre sequencial. Nenhum driver pula de `DISCOVERY_ONLY` direto 
 ## Transições entre estágios (guia de maturidade, não gate bloqueante)
 
 - `DRAFT → DISCOVERY_ONLY`: driver identificado, sem ainda ler dado real do equipamento.
-- `DISCOVERY_ONLY → READ_ONLY_ALPHA`: pelo menos um teste real (modelo + firmware) documentado por Bruno.
+- `DISCOVERY_ONLY → READ_ONLY_ALPHA`: pelo menos um teste real (modelo + firmware) documentado por Caio.
 - `READ_ONLY_ALPHA → READ_ONLY_BETA`: capabilities de leitura declaradas; Marisa confere telemetria no review normal.
 - `READ_ONLY_BETA → WRITE_BETA`: toda capability de escrita tem confirmação explícita do usuário e passou pela revisão de QA da Marisa (parte do review, não sign-off bloqueante) — ver `/seguranca-nethal`.
 - `WRITE_BETA → STABLE`: critérios objetivos acima cumpridos + decisão de produto do Rafael.
@@ -62,5 +62,5 @@ A decisão final de propor um driver para o SignallQ é do Rafael, com a revisã
 
 ## Limites
 
-- Esta skill descreve a maturidade de driver — quem evidencia teste é Bruno, quem revisa QA/segurança é Marisa, quem decide promoção é Rafael.
+- Esta skill descreve a maturidade de driver — quem evidencia teste é Caio, quem revisa QA/segurança é Marisa, quem decide promoção é Rafael.
 - Estágio declarado sem evidência documentada (teste real, revisão) não vale — sempre exigir rastro.

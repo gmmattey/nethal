@@ -129,6 +129,6 @@ Mínimos: 4.5:1 texto normal, 3:1 texto grande (≥18/700) e ícones/UI. Texto t
 
 ## Limites
 
-- Esta skill é referência de design, não implementa. Vera desenha/mantém o sistema (Claude Design — Artifacts + skills `frontend-design`/`impeccable`, nunca Figma); Bruno implementa em Compose a partir da spec da Vera.
+- Esta skill é referência de design, não implementa. Vera desenha/mantém o sistema (Claude Design — Artifacts + skills `frontend-design`/`impeccable`, nunca Figma); Caio implementa em Compose a partir da spec da Vera.
 - Fonte da verdade dos tokens é `docs/design/design-system.dc.html` — se este resumo divergir do arquivo fonte, o arquivo fonte vence. Atualizar este SKILL.md quando o design system mudar (a Vera edita o `.dc.html` original em `Claude Design/Nethal/` e recopia para `docs/design/`).
 - Valores já estão em dp/sp (unidades Android/Compose) — tradução direta pra `Dp`/`TextUnit` em Compose, sem conversão de px.

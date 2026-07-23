@@ -91,5 +91,5 @@ Regras de decisão:
 
 ## Limites
 
-- Esta skill orienta discovery e fingerprint, não implementa driver — implementação é do Bruno.
+- Esta skill orienta discovery e fingerprint, não implementa driver — implementação é do Caio.
 - Ação de escrita em qualquer protocolo passa por revisão de Marisa antes de sair de `EXPERIMENTAL`.

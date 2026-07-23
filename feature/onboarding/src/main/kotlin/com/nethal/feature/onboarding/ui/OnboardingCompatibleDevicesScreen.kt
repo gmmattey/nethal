@@ -47,7 +47,7 @@ object OnboardingCompatibleDevicesScreenTestTags {
  * Lê o catálogo real via [driverRegistry] (`buildOnboardingCompatibilityCatalog`), nunca texto
  * fixo — gap corrigido em relação ao protótipo original, que listava fabricantes/modelos
  * fictícios sob rótulos "HOMOLOGADOS"/"SUPORTADOS (BETA)" (vocabulário que não existe em
- * `/ciclo-vida-driver`). Banner de escopo parcial é obrigatório (regra do Bruno: nunca prometer
+ * `/ciclo-vida-driver`). Banner de escopo parcial é obrigatório (regra do Caio: nunca prometer
  * suporte universal).
  */
 @Composable

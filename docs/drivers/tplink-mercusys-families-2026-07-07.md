@@ -71,7 +71,7 @@
 4. Capturar payload bruto de leitura para cada família nova e só então promover parsers/capabilities específicas.
 5. Reavaliar, com hardware real, se `SG/CE_RED stok-luci` e `stok-luci senha específica` podem convergir para uma variante interna da família `stok-luci` ou se exigem famílias próprias.
 
-## Atualização 2026-07-10 (issue #20 — Bruno, completar as famílias órfãs, sem hardware físico)
+## Atualização 2026-07-10 (issue #20 — Caio, completar as famílias órfãs, sem hardware físico)
 
 Decisão do Luiz (plano de fundação HAL): as duas famílias permanecem no core (não removidas), e
 ganham `authenticate()` real + parser experimental por capability, mas continuam sem promoção de

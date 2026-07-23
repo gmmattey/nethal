@@ -1,13 +1,13 @@
 # Spec — Onboarding (1b/1c/1e/1f) e Pareamento manual (2g/2h/2i)
 
-Autoria: Vera (UX/UI). Entrega para: Bruno (implementação Compose).
+Autoria: Vera (UX/UI). Entrega para: Caio (implementação Compose).
 Issues cobertas: #69, #70, #72, #73 (Lote 1 — Onboarding) e #80, #81, #82 (Lote 2 — Pareamento manual).
 
 Base visual: `docs/design/design-system.dc.html` (tokens) + `docs/design/prototypes.dc.html`
 (telas `1b`, `1c`, `1e`, `1f`, `2g`, `2h`, `2i` — abrir no navegador para ver o protótipo
 navegável original). Este documento é **fiel ao protótipo onde o protótipo está certo** e
 **registra e corrige, de forma explícita, onde o protótipo diverge da implementação real**
-(ver seção "Gaps encontrados" em cada tela). Bruno implementa a partir deste documento, não
+(ver seção "Gaps encontrados" em cada tela). Caio implementa a partir deste documento, não
 do protótipo cru — em caso de conflito, este documento vence para estas 7 telas.
 
 ---
@@ -37,7 +37,7 @@ Perfis reais no manifesto ativo (6 profiles, deduplicados por vendor+model no qu
 unidade confirmada). Para toda superfície de UI (onboarding 1f, pareamento 2i), o Archer C6
 aparece **uma única vez**, com o **melhor estágio entre os dois profiles** (`READ_ONLY_ALPHA`,
 do perfil `stok-luci`). O Fingerprint Engine decide em runtime qual mecanismo usar — o usuário
-nunca escolhe "C6 antigo" vs. "C6 novo" manualmente. Bruno: ao ler o catálogo para popular estas
+nunca escolhe "C6 antigo" vs. "C6 novo" manualmente. Caio: ao ler o catálogo para popular estas
 telas, agrupar por `(vendor, model)` e usar `stage` de maior maturidade do grupo; não expor os
 dois `driverFamilyId` ao usuário.
 
@@ -192,7 +192,7 @@ mas hoje não tem destino definido. Fluxo corrigido:
 - Em `2h`, o item `"Outro / não sei"` deixa de navegar para `2i` (não existe "modelo" para
   fabricante desconhecido) e passa a navegar para uma tela de entrada manual de IP — reaproveita
   o campo de texto livre já implementado em `DiscoveryFailedScreen`/`MultipleCandidatesScreen`
-  (Bruno: mover/extrair esse componente de campo de IP para reuso aqui, não duplicar código).
+  (Caio: mover/extrair esse componente de campo de IP para reuso aqui, não duplicar código).
 - `DiscoveryFailedScreen` (usado hoje quando a descoberta automática falha totalmente) passa a
   oferecer dois caminhos, não um campo solto: **"Selecionar equipamento"** (entra no cluster por
   `2g`) e **"Informar IP manualmente"** (vai direto para o mesmo campo de IP usado a partir de
@@ -290,7 +290,7 @@ para essa hierarquia). Diálogo de confirmação "continuar mesmo assim" reaprov
 
 ---
 
-## Resumo de decisões para o Bruno implementar
+## Resumo de decisões para o Caio implementar
 
 1. **1b/1c**: nenhuma das duas dispara permissão real — só a tela `2a` (Discovery) pede
    `ACCESS_FINE_LOCATION` de verdade. CTA único `"Entendi, continuar"` nas duas, sem "Agora não".

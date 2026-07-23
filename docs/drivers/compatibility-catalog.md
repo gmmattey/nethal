@@ -3,7 +3,7 @@
 Este documento descreve o schema real do catálogo de compatibilidade offline, versionado em
 `core/src/main/resources/catalog/catalog-<YYYY.MM.DD>.json`, embarcado no NetHAL Core como
 fallback local para o Driver Registry (§8.5 da spec de produto). O Driver Registry (implementação
-do Bruno, Feat 3 / SIG-309) carrega este arquivo como base offline e sincroniza contra uma versão
+do Caio, Feat 3 / SIG-309) carrega este arquivo como base offline e sincroniza contra uma versão
 remota mais nova quando houver conexão, sem nunca bloquear uso offline — mesma regra do §8.5.
 
 ## Por que Nokia G-1425G-B e TP-Link Archer C6 são os dois primeiros profiles
@@ -232,7 +232,7 @@ Qualquer exibição ao usuário deve continuar usando `vendor: "Nokia"` (nome co
 profile); `manufacturer=ALCL` só é relevante como evidência de fingerprint interna ou nota de
 debugging, nunca como valor a expor na Tela de identificação do equipamento.
 
-**Gap de implementação corrigido (2026-07-11, Bruno)** — esta decisão estava documentada aqui desde
+**Gap de implementação corrigido (2026-07-11, Caio)** — esta decisão estava documentada aqui desde
 sempre, mas `NokiaGponDriverFamily.capabilityResultFor(READ_DEVICE_INFO)` (código escrito depois,
 migração da issue #18) passava `vendor = info.manufacturer` direto — ou seja, `DeviceInfo.vendor`
 exposto para a Tela 4 do Lab mostraria `"ALCL"`, não `"Nokia"`, contrariando esta nota desde a
@@ -268,7 +268,7 @@ real) provando que o hardcode funciona independente do campo bruto.
 ## Consumo pelo Driver Registry (fora de escopo desta entrega)
 
 O parsing/deserialização deste JSON em Kotlin, a lógica de diff incremental entre manifestos e a
-integração com o `DriverRegistry` real são responsabilidade do Bruno na Feat 3 (SIG-309). Este
+integração com o `DriverRegistry` real são responsabilidade do Caio na Feat 3 (SIG-309). Este
 documento e o `catalog-2026.07.07.json` são o insumo de dados — não incluem implementação de
 parser, cliente HTTP de sincronização ou testes de unidade Kotlin (o `DriverRegistry` em si já
 existe e está coberto por testes próprios em `core/src/test/kotlin/com/nethal/core/catalog/`,
@@ -340,7 +340,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
 
 ## Changelog
 
-- **2026-07-11 (Bruno — sem issue rastreada, revisão do driver Nokia contra duas fontes de evidência
+- **2026-07-11 (Caio — sem issue rastreada, revisão do driver Nokia contra duas fontes de evidência
   real: captura Playwright/Codex + field map do SignallQ)** — Revisão pedida sem bug reportado (Nokia
   é considerado funcional hoje, diferente do C6/#125). Duas fontes cruzadas: (1) captura de tráfego
   real do Codex via Playwright contra a unidade física (`192.168.1.254`),
@@ -432,7 +432,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   **Estágio do profile:** `READ_ONLY_ALPHA` mantido, sem promoção (não é decisão desta rodada,
   `/ciclo-vida-driver`). Nenhuma capability nova, nenhuma escrita implementada.
 
-- **2026-07-11 (Bruno — issue #125, correção real do contador `seq` do envelope `sign` em
+- **2026-07-11 (Caio — issue #125, correção real do contador `seq` do envelope `sign` em
   `tplink-stok-luci`)** — Investigação anterior (mesmo dia, entrada abaixo) tinha levantado a
   hipótese de lockout por múltiplos re-logins em sequência; **refutada por teste real do Luiz**
   isolando `tplinkC6StokManualCheck` a um único `login()` seguido de leituras autenticadas: login
@@ -483,7 +483,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   `tplink_archer_c6_stok_v1` não mudam nesta rodada — sem manifesto novo, é correção de código, não de
   catálogo.
 
-- **2026-07-11 (Bruno — investigação da issue #125, hipótese de lockout por múltiplos logins,
+- **2026-07-11 (Caio — investigação da issue #125, hipótese de lockout por múltiplos logins,
   refutada por teste real do Luiz)** — Ver entrada acima para a causa raiz real e a correção. Esta
   entrada preserva o registro da hipótese descartada: análise de código (`git diff` entre o commit
   confirmado em 2026-07-07 e a PR #124) não encontrou regressão em `fetchAuthenticatedRaw`,
@@ -493,7 +493,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   firmware. Teste real do Luiz isolando a um único login refutou essa hipótese (login sempre
   funciona; toda leitura falha mesmo com um login só) e apontou para o bug de `seq` documentado acima.
 
-- **2026-07-11 (Bruno — `REBOOT_DEVICE` no `tplink-stok-luci`, primeira capability de ação/escrita
+- **2026-07-11 (Caio — `REBOOT_DEVICE` no `tplink-stok-luci`, primeira capability de ação/escrita
   "genérica" do produto, issues #95/#103)** — Novo manifesto `catalog-2026.07.29.json`
   (`previousManifest: catalog-2026.07.28.json`).
 
@@ -548,7 +548,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   primeira capability de ação "genérica" do produto, fluxo de confirmação revisado com atenção
   redobrada conforme pedido explícito da tarefa.
 
-- **2026-07-11 (Bruno — Feat #27: `READ_OPTICAL_SIGNAL_MARGIN`/`READ_GPON_ERROR_COUNTERS`/
+- **2026-07-11 (Caio — Feat #27: `READ_OPTICAL_SIGNAL_MARGIN`/`READ_GPON_ERROR_COUNTERS`/
   `READ_LAN_PORT_STATUS` no driver Nokia, issues #28/#29/#30)** — Três novos campos/capabilities do
   levantamento de campo `NOKIA_GPON_FIELD_MAP.md` (produto irmão SignallQ), itens 1-3 da seção
   "Oportunidades", mesmo endpoint já lido pelo driver (`wan_status.cgi?gpon`) e um vizinho já
@@ -602,7 +602,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   Issue #35 (backlog de campos secundários, itens 5-8 do mesmo levantamento) registrada como
   backlog — nenhuma implementação nesta rodada, conforme o próprio critério de aceite da issue.
 
-- **2026-07-11 (Bruno — capabilities de topologia/rádio/DoS e ping nativo no `tplink-stok-luci`,
+- **2026-07-11 (Caio — capabilities de topologia/rádio/DoS e ping nativo no `tplink-stok-luci`,
   issues #31-#34, #36, #24, #26)** — Novo manifesto `catalog-2026.07.28.json`
   (`previousManifest: catalog-2026.07.27.json`, já com as capabilities novas do Nokia da entrada
   acima — conflito de merge real com a PR #121 resolvido preservando as duas rodadas, não
@@ -686,7 +686,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   `ANDROID_HOME`) — o branch novo em `CapabilityDisplay.kt` não foi verificado por build real, só
   por leitura; validação de app fica para a Marisa/gate de QA com Android SDK disponível.
 
-- **2026-07-10 (Bruno — migração de `NokiaOntDriver` para `NokiaGponDriverFamily`, issue #18)** —
+- **2026-07-10 (Caio — migração de `NokiaOntDriver` para `NokiaGponDriverFamily`, issue #18)** —
   `nokia_g1425gb_v1` declarava `driverFamilyId: "nokia-ont-gpon-driver"` desde o manifesto
   `2026.07.06`, mas nenhuma `DriverFamilyFactory` estava registrada sob essa chave em
   `defaultDriverFamilyRegistry()` — `DriverFamilyRegistry.resolve()` lançava
@@ -721,7 +721,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
     `NokiaGponDriverFamilyTest`, 4 em `NokiaGponCapabilityEngineIntegrationTest`, 1 em
     `DriverFamilyRegistryIntegrationTest` provando a resolução real via catálogo embarcado).
 
-- **2026-07-10 (Bruno — completar as famílias órfãs `tplink-gdpr-cgi-driver`/`tplink-xdr-ds-driver`,
+- **2026-07-10 (Caio — completar as famílias órfãs `tplink-gdpr-cgi-driver`/`tplink-xdr-ds-driver`,
   issue #20, sem hardware físico)** — Decisão do Luiz registrada no plano de fundação HAL: as duas
   famílias (com login funcional, `readCapability()` sempre `Unavailable` até aqui) ganham
   `authenticate()` real e parser experimental por capability, permanecendo órfãs de teste físico —
@@ -814,8 +814,8 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   continua o mesmo: Luiz rodar o `nokiaManualCheck` (já com a correção) contra 192.168.1.254 mais uma
   vez.
 
-  **Pendência de dados (Diego → Bruno, mesmo padrão de sempre):** `loadEmbeddedCatalogResource`
-  aponta para `catalog/catalog-2026.07.23.json` no momento desta entrada — Bruno bumpar para
+  **Pendência de dados (Diego → Caio, mesmo padrão de sempre):** `loadEmbeddedCatalogResource`
+  aponta para `catalog/catalog-2026.07.23.json` no momento desta entrada — Caio bumpar para
   `catalog/catalog-2026.07.24.json` (e as asserções de `manifestVersion` em
   `DriverRegistryTest`/`FingerprintEngineTest`) quando puder.
 
@@ -885,8 +885,8 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   mudar, é sinal de que a causa raiz não era só isto (ou não era só isto) — aí sim escalo para
   Rafael com o achado, sem decidir promoção sozinho.
 
-  **Pendência de dados (Diego → Bruno, mesmo padrão de sempre):** `loadEmbeddedCatalogResource`
-  ainda aponta para `catalog/catalog-2026.07.22.json` — Bruno bumpar para
+  **Pendência de dados (Diego → Caio, mesmo padrão de sempre):** `loadEmbeddedCatalogResource`
+  ainda aponta para `catalog/catalog-2026.07.22.json` — Caio bumpar para
   `catalog/catalog-2026.07.23.json` (e as asserções de `manifestVersion` em
   `DriverRegistryTest`/`FingerprintEngineTest`) quando puder; deixado assim de propósito, mesmo
   split de responsabilidade de sempre.
@@ -942,11 +942,11 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   Diego comparar contra os campos que `NokiaResponseParser` espera e decidir se é correção de
   parser ou variante de firmware.
 
-  **Pendência de dados (Diego → Bruno, mesmo padrão já usado nas rodadas anteriores de bump de
+  **Pendência de dados (Diego → Caio, mesmo padrão já usado nas rodadas anteriores de bump de
   manifesto) — RESOLVIDA:** `loadEmbeddedCatalogResource` (default agora
   `catalog/catalog-2026.07.22.json`, `core/src/main/kotlin/com/nethal/core/catalog/DriverRegistry.kt`)
   e as asserções de `manifestVersion` em `DriverRegistryTest`/`FingerprintEngineTest` foram
-  atualizadas por Bruno para o novo manifesto; `:core:test` está verde de novo.
+  atualizadas por Caio para o novo manifesto; `:core:test` está verde de novo.
 
 - **2026-07-08 (decisão do Rafael: `tplink_archer_c6_stok_v1` PROMOVIDO para
   `READ_ONLY_BETA`)** — Reavaliação da pendência registrada na entrada `2026-07-09` abaixo (nota:
@@ -997,7 +997,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   profile) — esta entrada de changelog registra a decisão, mas não edita o JSON (fora da minha
   alçada, não implemento/edito artefato de dado de produto). Diego: gerar novo manifesto
   (`catalog-2026.07.22.json`, `previousManifest: "catalog-2026.07.21.json"`) com `stage:
-  "READ_ONLY_BETA"` e `stageReason` citando esta entrada; Bruno: atualizar
+  "READ_ONLY_BETA"` e `stageReason` citando esta entrada; Caio: atualizar
   `loadEmbeddedCatalogResource` (default no momento desta entrada `catalog/catalog-2026.07.21.json`,
   hoje já `catalog/catalog-2026.07.22.json` — bump seguinte, por outro motivo, ver entrada de
   2026-07-08 sobre `nokia_g1425gb_v1` no topo deste changelog —
@@ -1042,7 +1042,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
      tentar autenticar? Ver KDoc de `AuthenticationViewModel.resolveDriver`.
 
   Nenhuma das três ressalvas altera `stage` do profile, capability declarada, ou comportamento de
-  segurança/telemetria — todas ficam para Rafael (produto) ou Bruno (implementação, se Rafael
+  segurança/telemetria — todas ficam para Rafael (produto) ou Caio (implementação, se Rafael
   decidir) num ciclo futuro. Suíte completa (`:app:test`, `:core:test`,
   `:app:compileDebugKotlin`) reconfirmada verde após as edições de KDoc (só documentação, sem
   mudança de comportamento).
@@ -1072,7 +1072,7 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   para o gate — não aceitável.
 
   **O que falta, e quem:**
-  1. **Bruno** — implementar a Tela 5 (Autenticação) com o aviso de TOFU descrito acima (mais os
+  1. **Caio** — implementar a Tela 5 (Autenticação) com o aviso de TOFU descrito acima (mais os
      demais campos já especificados: usuário, senha, botão testar, aviso de senha não salva, aviso
      de sessão única). Sem isso, este gate não fecha.
   2. **Diego** — quando a Tela 5 existir, validar ao vivo que o fluxo de login do
@@ -1095,10 +1095,10 @@ C20 como `TpLinkLegacyCgiDriverFamily`), aprovado com esta ressalva documentada.
   - Débito de arquitetura já registrado em `docs/architecture/hal-layering-model.md` §8 (atualização
     2026-07-08): `CapabilityEngine` ainda não consulta `profile.capabilities[]` do catálogo para
     declarar estado inicial por capability. Não bloqueia este gate especificamente, mas é a raiz da
-    ressalva anterior — Bruno mantém prioridade para o próximo ciclo de SDK.
+    ressalva anterior — Caio mantém prioridade para o próximo ciclo de SDK.
 
 - **2026-07-08 (revisão de segurança da Marisa — Telas 5/4/6 do NetHAL Lab, `AuthenticationScreen`/
-  `CapabilitiesScreen`/`ReportScreen`)** — Revisão do item 1 da pendência acima ("Bruno — implementar
+  `CapabilitiesScreen`/`ReportScreen`)** — Revisão do item 1 da pendência acima ("Caio — implementar
   a Tela 5 com o aviso de TOFU"): **cumprido**. `AuthenticationScreen` exibe o aviso quando
   `AuthenticationUiState.Ready.showTofuWarning` é `true` (só para `tplink-stok-luci-driver`), com
   texto fiel a esta seção — nem suaviza nem infla o risco: descreve a busca de chave sem

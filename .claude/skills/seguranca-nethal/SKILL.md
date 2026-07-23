@@ -80,5 +80,5 @@ IP público: 201.17.45.90 → 201.17.xxx.xxx
 
 ## Limites
 
-- Esta skill é referência técnica, não implementa — implementação cabe a Bruno, revisão (parte do QA normal) cabe a Marisa.
+- Esta skill é referência técnica, não implementa — implementação cabe a Caio, revisão (parte do QA normal) cabe a Marisa.
 - Dúvida sobre risco de uma ação nova: exigir confirmação do usuário e sinalizar no review — na dúvida, não executar automaticamente.

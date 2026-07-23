@@ -42,7 +42,7 @@ private val NETWORK_ACTION_CAPABILITIES = listOf(
  * `com.nethal.feature.wifinetwork.unavailable.UnavailableResourceState`, com o motivo real:
  * o `reason` do driver quando a capability é lida como indisponível, ou uma nota explícita de "Core
  * ainda não implementa a execução" quando o driver já declara a capability como disponível para
- * leitura. Implementar o executor de escrita de verdade é tarefa própria do Core (Bruno), fora do
+ * leitura. Implementar o executor de escrita de verdade é tarefa própria do Core (Caio), fora do
  * escopo desta tela — quando existir, só [WifiNetworkActionUiModel.available] muda de `false` para
  * `true`, o resto do contrato desta tela não muda.
  */

@@ -106,7 +106,7 @@ possam consultar.
    "descrição textual da família/linha do produto, para contexto humano"
    (`compatibility-catalog.md:63`) — isto é *linha de produto comercial* (ex.: "Archer"), não a
    Driver Family de código proposta aqui. Manter os dois com o mesmo nome vai confundir todo mundo
-   (Diego, Bruno, Rafael) assim que a nova camada existir.
+   (Diego, Caio, Rafael) assim que a nova camada existir.
 
 ---
 

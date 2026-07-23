@@ -50,5 +50,5 @@ O NetHAL Lab é Android-first porque discovery de rede local e probing de dispos
 
 ## Limites
 
-- Esta skill orienta comportamento de plataforma, não implementa — implementação é do Bruno.
+- Esta skill orienta comportamento de plataforma, não implementa — implementação é do Caio.
 - Comportamento incerto em OEM específico (Samsung, MIUI) deve ser declarado explicitamente e testado em device real antes de assumir funcionamento.

@@ -2,7 +2,7 @@
 
 Status: Aceita (2026-07-11, diretiva direta de Luiz — "não quero um sistema monolítico, quero tudo
 modular, inclusive as telas independentes; funcionalidades construídas de forma independente e
-conectáveis"). Detalhamento técnico: Rafael/Bruno.
+conectáveis"). Detalhamento técnico: Rafael/Caio.
 
 ## Contexto
 
@@ -111,7 +111,7 @@ duplicação hoje é justamente entre `ViewModelFactory` e `NetHalApplication`).
 
 ## Próximo passo
 
-Bruno executa a Fase 1 (extração de `:core:*`, `:driver:*`, `:core:navigation`,
+Caio executa a Fase 1 (extração de `:core:*`, `:driver:*`, `:core:navigation`,
 `:core:designsystem`, redução de `:app` ao composition root) como pré-requisito de todo o resto do
 épico de redesenho. Fase 2 (cada `:feature:*` novo nasce já modular) começa assim que a Fase 1
 mergear — inclusive a retomada de #67 (host de bottom nav), agora só como o composition root que

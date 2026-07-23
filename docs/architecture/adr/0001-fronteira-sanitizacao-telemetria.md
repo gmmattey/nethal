@@ -79,7 +79,7 @@ consequências acima, atualiza os testes que hoje esperam `ssidHash`/`macAddress
 `TpLinkStokLuciModels.kt` que hoje descreve a sanitização como regra da spec §8.9 aplicada "já na
 origem" — essa frase deve ser removida/corrigida para refletir esta decisão.
 
-## Extensão 2026-07-08 (Bruno, issue #16 — Capability Engine com sessão real)
+## Extensão 2026-07-08 (Caio, issue #16 — Capability Engine com sessão real)
 
 Esta decisão se aplicava só ao modelo interno de `TpLinkStokLuciDriverFamily`
 (`TpLinkStokLuciWifiRadio`/`TpLinkStokLuciLanStatus`/`TpLinkStokLuciConnectedClient`, todos
