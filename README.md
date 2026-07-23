@@ -1,6 +1,6 @@
-# NETHAL
+# SignallQ Nethal
 
-**Network Hardware Abstraction Layer**
+**Network Hardware Abstraction Layer** (motor interno: NetHAL) — renomeado de "Nethal" em 2026-07-23.
 
 Camada experimental para descobrir, identificar, consultar e controlar com segurança equipamentos da rede local, como roteadores, ONTs, ONUs, access points, sistemas mesh e gateways.
 
@@ -10,7 +10,9 @@ Oferecer uma interface comum sobre diferentes fabricantes, firmwares e protocolo
 
 ## Relação com o SignallQ
 
-O NETHAL é um projeto independente. Drivers que forem validados, estabilizados e considerados seguros poderão ser integrados futuramente ao ecossistema SignallQ.
+Já faz parte da família de marca SignallQ (desde a renomeação de 2026-07-23), mas segue como
+laboratório — não é ainda o produto final. Drivers que forem validados, estabilizados e
+considerados seguros poderão ser integrados futuramente ao ecossistema SignallQ consumer.
 
 ## Escopo inicial
 

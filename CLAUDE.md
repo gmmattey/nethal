@@ -1,8 +1,15 @@
-# NetHAL
+# SignallQ Nethal
 
-Network Hardware Abstraction Layer. Produto experimental e independente do SignallQ, para descoberta, identificação e controle seguro de equipamentos de rede local (roteadores, ONTs, ONUs, APs, mesh).
+Network Hardware Abstraction Layer (motor interno: NetHAL). Renomeado de "Nethal" para
+**SignallQ Nethal** em 2026-07-23 (repo GitHub `gmmattey/nethal` → `gmmattey/signallq-nethal`,
+pasta local `Nethal/` → `SignallQ Nethal/`) para refletir que o produto passa a fazer parte da
+família SignallQ, não mais "produto experimental e independente" — segue laboratório, não produto
+final, mas com identidade de marca conectada ao SignallQ desde já, e não só como incorporação
+futura de drivers.
 
-Drivers estáveis poderão ser incorporados futuramente ao SignallQ como "SignallQ Router Intelligence powered by NetHAL". Até lá, o NetHAL é laboratório, não produto final.
+Descoberta, identificação e controle seguro de equipamentos de rede local (roteadores, ONTs, ONUs,
+APs, mesh). Drivers estáveis poderão ser incorporados futuramente ao SignallQ consumer como
+"SignallQ Router Intelligence powered by NetHAL".
 
 ## Status
 
@@ -66,13 +73,13 @@ Acesso remoto fora da LAN, integração com operadoras, TR-069 ACS, TR-369 Contr
 
 ## Fonte da verdade de execução
 
-Execução, backlog, prioridades e bugs vivem no **GitHub Issues** (`gmmattey/nethal`). Toda issue nova, prioridade ou status de trabalho vive lá — não em conversa, Slack ou chat.
+Execução, backlog, prioridades e bugs vivem no **GitHub Issues** (`gmmattey/signallq-nethal`). Toda issue nova, prioridade ou status de trabalho vive lá — não em conversa, Slack ou chat.
 
 **Convenção de issue:** título `Task - <descrição>` para trabalho planejado e `[BUG] <descrição>` para defeito, com label de tipo (`type:task`/`type:bug`) e prioridade (`P0`/`P1`/`P2`) quando fizer sentido. Ver skill global `/issue-conventions`. Templates em `.github/ISSUE_TEMPLATE/` (`task.yml`, `bug.yml`, `driver.yml`).
 
 **Verificação real antes de declarar (regra transversal, todos os agentes):** nunca declarar "PR mergeada", "teste passou", "driver promovido" ou "publicado" sem verificação executada de fato — não por inferência, não por confiar no relato de outro agente:
-- PR mergeada → `gh pr view <N> --repo gmmattey/nethal --json state,merged,mergedAt`
-- CI/teste passou → `gh pr checks <N> --repo gmmattey/nethal` ou execução direta
+- PR mergeada → `gh pr view <N> --repo gmmattey/signallq-nethal --json state,merged,mergedAt`
+- CI/teste passou → `gh pr checks <N> --repo gmmattey/signallq-nethal` ou execução direta
 - Validação de driver/discovery → device Android real e firmware alvo declarado, nunca só mock local
 
 ## Squad do projeto

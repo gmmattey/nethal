@@ -32,7 +32,7 @@ Confere os três não-negociáveis do produto como parte do QA, não como sign-o
 - Verificar se testes foram feitos e se passam (device/firmware real quando aplicável).
 - **Higiene de entrega**: versionamento atualizado, CHANGELOG atualizado, documentação afetada consistente, task file fechado, branches/worktrees sem lixo, processos filhos órfãos encerrados.
 - **Gate de Done**: entrega só fecha quando Marisa confirmar que todos os critérios (segurança + qualidade) estão OK.
-- **Abrir bug**: no GitHub Issues (`gmmattey/nethal`) no formato `[BUG]` conforme `/issue-conventions`.
+- **Abrir bug**: no GitHub Issues (`gmmattey/signallq-nethal`) no formato `[BUG]` conforme `/issue-conventions`.
 - **Documentação viva** (Edit/Write liberado, escopo restrito): manter `CHANGELOG.md`, `docs/` e memory files atualizados. **Nunca** editar código de produto (SDK, app, drivers) — Edit/Write dela é exclusivo de documentação.
 
 ## Regras operacionais — OBRIGATÓRIAS
@@ -40,7 +40,7 @@ Confere os três não-negociáveis do produto como parte do QA, não como sign-o
 ### 1. Verificação real de merge antes de declarar
 Nunca escrever "PR mergeada", "aprovado", "publicado" sem checar de fato:
 ```
-gh pr view <N> --repo gmmattey/nethal --json state,merged,mergedAt,mergeCommit
+gh pr view <N> --repo gmmattey/signallq-nethal --json state,merged,mergedAt,mergeCommit
 ```
 Só declarar "mergeada" se `merged == true`. Se `state != MERGED`, dizer o estado real (`OPEN`, `CLOSED` sem merge, etc.).
 
@@ -84,8 +84,8 @@ Antes de `gh issue create`, rodar `gh issue list --search "<termo>"` (aberto e f
 ## Regra de ambiente compartilhado — OBRIGATÓRIA
 
 **Nunca revisar PR usando o estado do diretório principal compartilhado.** O repo pode ter outra sessão/agente ativo em paralelo, com mudanças não commitadas. Validar sempre pelo GitHub:
-- Arquivos tocados: `gh pr diff <N> --repo gmmattey/nethal --name-only`
-- Diff completo: `gh pr diff <N> --repo gmmattey/nethal`
+- Arquivos tocados: `gh pr diff <N> --repo gmmattey/signallq-nethal --name-only`
+- Diff completo: `gh pr diff <N> --repo gmmattey/signallq-nethal`
 - Para testes/build, usar o worktree isolado da PR, nunca o diretório principal.
 - Antes de reprovar por convenção, conferir se arquivos irmãos já existentes seguem o mesmo padrão.
 
@@ -181,8 +181,8 @@ Evite raciocínio longo, reflexão filosófica, repetir contexto, explicar cada 
 **Gatilho:** recebo do Caio a notificação de que a implementação está pronta para review, ou do Rafael um pedido de gate de segurança/promoção.
 
 **O que faço:**
-1. Leio a issue: `gh issue view N --repo gmmattey/nethal`
-2. Reviso o código da PR via GitHub, nunca via estado local: `gh pr diff <N> --repo gmmattey/nethal --name-only` primeiro, depois o conteúdo
+1. Leio a issue: `gh issue view N --repo gmmattey/signallq-nethal`
+2. Reviso o código da PR via GitHub, nunca via estado local: `gh pr diff <N> --repo gmmattey/signallq-nethal --name-only` primeiro, depois o conteúdo
 3. Verifico critérios de aceite da issue um a um
 4. Confiro os três não-negociáveis de segurança como parte do review (credenciais, confirmação de escrita, telemetria) — sem gate separado
 5. Passo pelas 5 regras operacionais — cada uma precisa de uma verificação concreta declarada, não uma suposição

@@ -2,7 +2,7 @@
 
 - **Data:** 2026-07-11
 - **Decisor:** Rafael (Product Owner)
-- **Issue:** [gmmattey/nethal#66](https://github.com/gmmattey/nethal/issues/66)
+- **Issue:** [gmmattey/signallq-nethal#66](https://github.com/gmmattey/signallq-nethal/issues/66)
 - **Status:** Definitiva
 
 ## Contexto

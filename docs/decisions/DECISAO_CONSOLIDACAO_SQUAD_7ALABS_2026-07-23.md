@@ -26,7 +26,7 @@ pediu pra tratar a 7ALabs como uma empresa só — ver decisão canônica para o
 
 ## O que não mudou
 
-- Todas as convenções deste repo continuam valendo: GitHub Issues (`gmmattey/nethal`), ciclo de
+- Todas as convenções deste repo continuam valendo: GitHub Issues (`gmmattey/signallq-nethal`), ciclo de
   vida de driver, os três não-negociáveis de segurança, skills locais (`/modelo-capacidades`,
   `/seguranca-nethal`, `/ciclo-vida-driver`, `/nethal-design` etc.).
 - A regra de que promoção de estágio de driver é decisão de produto (agora da Claudete) com
